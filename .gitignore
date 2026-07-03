@@ -1,0 +1,113 @@
+# ─── OluOra Monorepo .gitignore ───────────────────────────────────────────────
+# Covers: frontend/ (Next.js) and backend/ (FastAPI / Python)
+
+# ── OS & Editor ───────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+
+# VS Code (keep workspace settings if desired, ignore local overrides)
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/*.code-workspace
+
+# ── Environment & Secrets (NEVER commit these) ─────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# ── Python / Backend ──────────────────────────────────────────────────────────
+# Virtual environments
+backend/.venv/
+backend/venv/
+backend/env/
+backend/.env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+dist/
+build/
+*.egg-info/
+*.egg
+MANIFEST
+
+# Alembic — keep migrations, ignore compiled artifacts
+backend/alembic/versions/__pycache__/
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Next.js type gen (auto-generated, not for source control)
+frontend/next-env.d.ts
+
+# Package lock — commit package-lock.json for reproducible installs
+# (pnpm / yarn alternatives below if you switch)
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Vercel deployment
+.vercel/
+frontend/.vercel/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+frontend/*.tsbuildinfo
+
+# Testing & coverage
+coverage/
+frontend/coverage/
+.nyc_output/
+playwright-report/
+test-results/
+e2e-results/
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.pem
+*.key
+*.crt
+.cache/
+tmp/
+temp/

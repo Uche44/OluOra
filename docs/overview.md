@@ -1,401 +1,464 @@
-# OluNdi — Project Documentation
+# OluNdi — Product Requirements & Project Overview
 
-## 1. Product Overview
+# 1. Executive Summary
 
-**OluNdi** is an AI-powered creator analytics platform that analyzes comments from social media videos and extracts meaningful insights about audience interests, questions, and feedback.
+**OluNdi** is an AI-powered audience intelligence platform that helps creators understand what their audience truly wants by analyzing conversations across their content.
 
-Content creators often receive **hundreds or thousands of comments** on their videos. Within those comments are valuable signals about:
+Every day, creators receive hundreds or thousands of comments. Hidden inside those comments are valuable insights:
 
-* what viewers are confused about
-* what viewers want to learn next
-* what product questions people have
-* what content resonates most with the audience
+* questions viewers repeatedly ask
+* pain points they experience
+* misconceptions about products or services
+* buying intent
+* feature requests
+* future content ideas
 
-However, manually reading thousands of comments is **impractical and time-consuming**.
+Unfortunately, these signals are buried inside large volumes of unstructured text, making them nearly impossible to analyze manually.
 
-OluNdi solves this problem by automatically analyzing comment data from creator videos and converting it into **structured audience intelligence**.
+OluNdi transforms these conversations into actionable intelligence.
 
-Instead of scrolling through comments, creators receive insights like:
+Instead of reading 5,000 comments, creators instantly understand:
 
-* “38% of viewers are asking about pricing.”
-* “21% want a beginner tutorial.”
-* “15% are confused about setup.”
+* what people are asking
+* why they are asking it
+* what content should be created next
+* which topics are gaining momentum
+* what opportunities they are currently missing
 
-These insights allow creators to:
+OluNdi is not another analytics dashboard.
 
-* understand their audience faster
-* produce content people are actively requesting
-* increase engagement and retention
-* identify opportunities for monetization
-
-The platform initially focuses on creators publishing content on **video-based platforms** such as:
-
-* YouTube
-* TikTok
+It is an AI system that listens to an audience at scale and tells creators exactly what matters.
 
 ---
 
 # 2. Vision
 
-The long-term vision of OluNdi is to become **the intelligence layer for creator audiences**.
+Our vision is to become the world's leading **Audience Intelligence Platform** for creators.
 
-Instead of creators guessing what content to produce next, OluNdi will provide **data-driven content insights derived directly from audience conversations**.
+Traditional creator analytics answer questions like:
 
-In the future, the platform can expand to support:
+* How many views did I receive?
+* How many subscribers did I gain?
+* What is my engagement rate?
 
-* brand sentiment analysis
-* product feedback mining
-* creator audience research
-* automated content strategy recommendations
+OluNdi answers entirely different questions:
+
+* What does my audience actually want?
+* What is confusing them?
+* What content are they requesting?
+* What products are they interested in?
+* What should I create next?
+* How has my audience changed over time?
+
+Our goal is to make audience understanding as measurable and accessible as traditional social media analytics.
+
+In the long term, OluNdi will become the intelligence layer that sits between creators and their audiences, helping creators make every content decision based on evidence rather than assumptions.
 
 ---
 
-# 3. Problem Statement
+# 3. Mission
 
-Creators struggle with extracting useful insights from audience interactions.
+To eliminate guesswork from content creation by turning millions of audience conversations into clear, actionable insights.
 
-### Key challenges
+Every creator deserves to know exactly what their audience is thinking.
 
-1. **Comment overload**
+---
 
-Popular videos can generate thousands of comments. Important insights get buried inside large volumes of text.
+# 4. The Problem
 
-2. **Manual analysis is impossible**
+Creators spend enormous amounts of time trying to understand their audience.
 
-Reading comments one by one takes too much time.
+After publishing a successful video, thousands of comments may arrive within hours.
 
-3. **Creators miss content opportunities**
+Inside those comments are answers to important questions:
 
-Many creators ask:
+* Which part of the video confused viewers?
+* Which feature generated the most excitement?
+* What objections prevented someone from buying?
+* What tutorial do viewers want next?
+* Which audience segment is growing?
 
-* “What video should I make next?”
-* “What questions do people have?”
-* “What part of my video confused viewers?”
+Unfortunately, discovering these answers requires manually reading comments one by one.
 
-These answers already exist inside the comments but are difficult to identify.
+As creators grow, this quickly becomes impossible.
 
-4. **Existing analytics tools focus on metrics**
+Existing analytics platforms focus primarily on numerical metrics such as:
 
-Most analytics platforms provide metrics like:
-
-* views
+* impressions
+* engagement
 * watch time
 * follower growth
+* click-through rate
 
-But they **do not analyze audience conversations**.
+While useful, these metrics explain **what happened**, not **why it happened**.
 
----
+Audience conversations contain the missing context.
 
-# 4. Solution
-
-OluNdi uses AI and natural language processing to analyze comments and extract meaningful patterns.
-
-The platform processes comment data to:
-
-1. Identify **frequently asked questions**
-2. Detect **recurring audience topics**
-3. Cluster comments by theme
-4. Generate **actionable insights**
-5. Suggest new content ideas
-
-Example insight output:
-
-```
-38% of viewers are asking about pricing
-22% want a beginner tutorial
-14% are confused about setup
-```
-
-The system also generates content ideas such as:
-
-* “Create a video explaining your pricing model”
-* “Make a beginner guide”
-* “Record a detailed setup tutorial”
+OluNdi exists to uncover it.
 
 ---
 
-# 5. Target Users
+# 5. Solution
+
+OluNdi connects directly to a creator's social media accounts and continuously analyzes audience conversations.
+
+Using artificial intelligence, natural language processing, clustering algorithms, and semantic analysis, the platform converts raw comments into structured audience intelligence.
+
+Instead of presenting thousands of comments, OluNdi delivers concise insights such as:
+
+> 38% of viewers are asking about pricing.
+
+> 24% are requesting a beginner tutorial.
+
+> 17% are confused about setup.
+
+> Buying intent increased significantly after your latest video.
+
+The platform doesn't stop at identifying problems.
+
+It recommends what creators should do next.
+
+Examples include:
+
+* Create a pricing breakdown video.
+* Record a beginner guide.
+* Publish a comparison video.
+* Address the most common misconceptions.
+* Create FAQ content based on recurring questions.
+
+The objective is to help creators make smarter decisions with confidence.
+
+---
+
+# 6. Product Positioning
+
+OluNdi is **not** a social media analytics platform.
+
+OluNdi is an **Audience Intelligence Platform.**
+
+Traditional analytics platforms measure performance.
+
+OluNdi measures audience understanding.
+
+Instead of focusing on metrics like:
+
+* views
+* likes
+* impressions
+* followers
+
+OluNdi focuses on:
+
+* audience intent
+* recurring questions
+* buying signals
+* audience sentiment
+* content demand
+* emerging trends
+
+This positioning differentiates OluNdi from conventional creator dashboards.
+
+---
+
+# 7. Target Users
 
 ## Primary Users
 
-**Content creators**
-
-Examples:
+Creators who publish educational or informative content, including:
 
 * YouTubers
 * TikTok creators
-* educational creators
-* product reviewers
-* SaaS founders making content
 * online educators
+* SaaS founders
+* coaches
+* consultants
+* product reviewers
+* technical creators
+* finance creators
+* developers
+* AI creators
 
-### Creator Pain Points
-
-Creators want to know:
-
-* what their audience wants
-* what questions viewers are asking
-* which topics they should cover next
+These creators rely heavily on audience engagement and frequently receive large volumes of comments.
 
 ---
 
-## Secondary Users (future expansion)
+## Secondary Users
 
+Future expansion includes:
+
+* creator agencies
 * influencer marketing agencies
-* brands analyzing influencer audiences
-* product teams analyzing user feedback
+* digital marketing teams
+* brands
+* product managers
+* customer success teams
+* research organizations
 
 ---
 
-# 6. Core Features (MVP)
+# 8. Core Value Proposition
 
-## 1. Creator Authentication
+OluNdi enables creators to answer questions they currently cannot answer efficiently.
 
-Creators sign up using their social media accounts.
+Instead of wondering:
 
-Authentication options:
+"What video should I make next?"
 
-* YouTube login
-* TikTok login
+They know.
 
-After authentication, the platform can access the creator’s videos.
+Instead of asking:
+
+"What are people confused about?"
+
+They know.
+
+Instead of reading comments for three hours every evening...
+
+They receive an AI-generated summary within minutes.
 
 ---
 
-## 2. Creator Dashboard
+# 9. MVP Features
 
-The dashboard displays all videos belonging to the creator.
+## 9.1 Social Authentication
 
-Each video card includes:
+Creators authenticate using their existing creator accounts.
 
-* video thumbnail
+Supported platforms:
+
+* YouTube
+* TikTok
+
+Authentication also authorizes OluNdi to retrieve creator-owned content and associated comments.
+
+---
+
+## 9.2 Creator Dashboard
+
+After login, creators land on a dashboard displaying their connected content.
+
+Each video displays:
+
+* thumbnail
 * title
-* view count
-* like count
-* comment count
-* analyze button
+* publish date
+* views
+* likes
+* comments
+* engagement summary
+* analysis status
 
-Users can select a video to analyze its comments.
+Videos are intentionally loaded first without comments to minimize latency.
 
----
-
-## 3. Comment Fetching
-
-When a video is selected, the system fetches comments using platform APIs.
-
-For example:
-
-YouTube comments can be retrieved using the official API from Google.
-
-Comment data includes:
-
-* comment text
-* like count
-* author
-* timestamp
+Comment retrieval begins only when analysis is requested.
 
 ---
 
-## 4. Comment Processing
+## 9.3 Video Analysis
 
-After comments are retrieved, the system processes them through an AI pipeline.
+Selecting a video initiates an analysis pipeline.
 
-Steps include:
+The system retrieves comments directly from the platform API.
 
-1. Text cleaning
-2. Language normalization
-3. Embedding generation
-4. Topic clustering
-5. Insight extraction
+Comment retrieval is performed on demand to reduce unnecessary API calls and improve scalability.
 
 ---
 
-## 5. Audience Insight Generation
+## 9.4 AI Processing Pipeline
 
-After clustering comment topics, the platform generates insight summaries such as:
+Each analysis follows a structured pipeline.
 
-```
-38% asking about pricing
-27% asking how the tool works
-18% requesting tutorials
-```
-
-Insights are displayed visually using charts and cards.
-
----
-
-## 6. Trending Questions
-
-The system extracts the most frequently asked questions.
-
-Example output:
-
-* “Is this free?”
-* “Can beginners use this?”
-* “Where can I buy this?”
+1. Retrieve comments
+2. Clean and normalize text
+3. Detect language
+4. Remove spam and duplicates
+5. Extract frequently asked questions
+6. Generate semantic embeddings
+7. Cluster similar discussions
+8. Identify recurring themes
+9. Measure topic prevalence
+10. Generate actionable insights
+11. Produce content recommendations
 
 ---
 
-## 7. Content Idea Generator
+## 9.5 Audience Intelligence
 
-Based on detected audience questions, OluNdi suggests content ideas.
+The final analysis presents structured insights including:
+
+### Topic Distribution
+
+Example:
+
+* Pricing Questions — 38%
+* Beginner Tutorials — 24%
+* Feature Requests — 15%
+* Technical Issues — 11%
+* General Feedback — 12%
+
+---
+
+### Most Asked Questions
 
 Examples:
 
-Suggested content:
-
-* “Complete beginner tutorial”
-* “How pricing works”
-* “Common mistakes beginners make”
+* Is this free?
+* Can beginners use this?
+* How does pricing work?
+* Does this work on mobile?
+* Which plan should I choose?
 
 ---
 
-# 7. Technical Architecture
+### Audience Pain Points
 
-The platform uses a modern web architecture composed of three main layers.
+Examples:
 
-### Frontend
+* Setup confusion
+* Missing documentation
+* Feature discoverability
+* Pricing uncertainty
 
-The user interface is built using:
+---
+
+### Positive Feedback
+
+Examples:
+
+* Easy to understand
+* Helpful explanation
+* Saved me time
+
+---
+
+### Content Opportunities
+
+Examples:
+
+* Beginner tutorial
+* Pricing breakdown
+* Product comparison
+* Frequently asked questions
+* Common mistakes
+
+---
+
+# 10. Technical Architecture
+
+## Frontend
+
+Technology:
 
 * Next.js
+* TypeScript
+* Tailwind CSS
+* TanStack Query
+* Zustand
+* shadcn/ui
 
-The frontend provides:
+Responsibilities:
 
-* authentication UI
+* authentication
 * dashboard
-* video insights pages
-* charts and analytics visualization
+* video management
+* insight visualization
+* user settings
 
 ---
 
-### Backend
+## Backend
 
-The backend API is built using:
+Technology:
 
 * FastAPI
+* SQLAlchemy
+* Alembic
+* PostgreSQL
+* JWT Authentication
 
-Responsibilities include:
+Responsibilities:
 
-* user authentication
+* OAuth authentication
 * video retrieval
 * comment retrieval
-* analysis pipeline
+* AI orchestration
+* data persistence
 * API responses
 
 ---
 
-### Database
+## AI Layer
 
-All application data is stored in:
+Responsibilities:
 
-* PostgreSQL
+* comment preprocessing
+* semantic embeddings
+* clustering
+* insight generation
+* recommendation engine
 
-Tables include:
-
-* users
-* videos
-* comments
-* analysis results
-
----
-
-# 8. AI Analysis Pipeline
-
-The AI pipeline converts raw comments into insights.
-
-Steps:
-
-1. Fetch comments
-2. Clean and preprocess text
-3. Generate embeddings
-4. Cluster similar comments
-5. Extract recurring topics
-6. Calculate frequency percentages
-7. Generate insights
-
-This transforms thousands of comments into a **structured audience understanding**.
+Future versions may incorporate retrieval-augmented generation, vector databases, and custom fine-tuned models as the platform scales.
 
 ---
 
-# 9. Example Insight Output
+## Database
 
-Example video with 2,000 comments.
+Core entities include:
 
-OluNdi analysis:
+* Users
+* Social Accounts
+* Videos
+* Comments
+* Analyses
+* Insights
+* Questions
 
-```
-Topic Breakdown
-
-Pricing questions — 38%
-Beginner questions — 27%
-Feature requests — 15%
-General feedback — 12%
-Other — 8%
-```
-
-Suggested content ideas:
-
-* Pricing breakdown video
-* Beginner tutorial
-* Feature comparison video
+The schema is designed to support multiple social platforms while maintaining a unified audience intelligence model.
 
 ---
 
-# 10. Monetization Strategy
+# 11. Product Workflow
 
-Possible pricing model:
+The complete creator journey is designed to be simple.
 
-### Free Tier
-
-* limited analyses
-* basic insights
-
-### Pro Plan
-
-* unlimited video analysis
-* deeper audience insights
-* content idea generation
-
-### Agency Plan (future)
-
-* multi-creator dashboards
-* white-label reports
+1. Creator signs in with YouTube or TikTok.
+2. OluNdi imports the creator's videos.
+3. Dashboard displays available videos.
+4. Creator selects a video.
+5. OluNdi retrieves comments.
+6. AI analyzes audience conversations.
+7. Insights are generated.
+8. Creator receives actionable recommendations.
+9. Creator creates better content based on real audience demand.
 
 ---
 
-# 11. Competitive Advantage
+# 12. Long-Term Roadmap
 
-Most social media analytics platforms focus on:
+The MVP focuses on individual video analysis.
 
-* follower growth
-* impressions
-* engagement metrics
+Future releases will expand OluNdi into a comprehensive creator intelligence platform.
 
-Platforms like:
+Planned capabilities include:
 
-* Socialinsider
-* Agorapulse
-* HypeAuditor
+### Cross-Platform Intelligence
 
-do not deeply analyze **comment conversations**.
-
-OluNdi focuses on **audience voice extraction**, which is a less crowded niche.
-
----
-
-# 12. Future Roadmap
-
-Potential future features include:
-
-### Multi-platform support
-
-Additional platforms:
+Support for:
 
 * Instagram
-* X (Twitter)
+* X
 * Reddit
 * LinkedIn
+* Facebook
+* Threads
+
+---
+
+### Audience Memory
+
+Rather than analyzing one video at a time, OluNdi will understand audience evolution across months or years of content.
+
+Creators will see how interests, questions, and trends change over time.
 
 ---
 
@@ -404,46 +467,113 @@ Additional platforms:
 Automatically generate:
 
 * weekly content calendars
-* video topic suggestions
+* publishing schedules
+* topic prioritization
+* content series
+* thumbnail suggestions
+* title recommendations
 
 ---
 
-### Sentiment Analysis
+### Audience Segmentation
 
-Detect:
+Identify:
 
-* positive feedback
-* negative feedback
-* audience sentiment trends
+* beginners
+* advanced users
+* buyers
+* casual viewers
+* loyal followers
 
----
-
-### Brand Insights
-
-Brands could analyze:
-
-* influencer audiences
-* product feedback in comments
+Each segment will receive its own insight profile.
 
 ---
 
-# 13. Success Metrics
+### Brand Intelligence
 
-Key metrics for product success:
-
-* number of creators onboarded
-* number of videos analyzed
-* insights generated per user
-* creator retention rate
+Brands will be able to analyze creator audiences before launching partnerships.
 
 ---
 
-# 14. Long-Term Opportunity
+### Competitive Intelligence
 
-Audience conversations are one of the most underutilized data sources in social media.
-
-OluNdi positions itself as a platform that **transforms unstructured audience conversations into strategic insights for creators and brands**.
-
-If executed well, the platform can evolve into a **creator intelligence platform used by thousands of creators globally**.
+Creators can compare audience interests against competitors to identify content gaps and emerging opportunities.
 
 ---
+
+# 13. Monetization Strategy
+
+## Free Plan
+
+* limited analyses
+* basic audience insights
+* limited history
+
+---
+
+## Creator Pro
+
+* unlimited analyses
+* advanced audience intelligence
+* AI recommendations
+* historical trends
+* exports
+
+---
+
+## Team & Agency
+
+* multiple creator workspaces
+* collaborative dashboards
+* client reporting
+* white-label exports
+* centralized analytics
+
+---
+
+# 14. Competitive Advantage
+
+Most analytics platforms answer:
+
+"What happened?"
+
+OluNdi answers:
+
+"Why did it happen, and what should you do next?"
+
+This distinction creates a defensible position in the creator economy.
+
+Rather than competing on metrics already offered by established platforms, OluNdi focuses on interpreting audience conversations and converting them into strategic decisions.
+
+Its long-term advantage lies in building a proprietary understanding of audience behavior that becomes more valuable as more conversations are analyzed.
+
+---
+
+# 15. Success Metrics
+
+Product success will be measured by:
+
+* creators onboarded
+* connected social accounts
+* videos analyzed
+* comments processed
+* insights generated
+* repeat analyses
+* weekly active creators
+* creator retention
+* recommendation adoption rate
+* time saved compared to manual analysis
+
+These metrics reflect not only platform usage but also the value OluNdi delivers to creators.
+
+---
+
+# 16. Long-Term Opportunity
+
+Audience conversations are one of the richest and least-utilized datasets in the creator economy.
+
+Every comment represents a signal—an opinion, a question, a request, or an unmet need.
+
+OluNdi's long-term ambition is to become the system that continuously interprets those signals and helps creators act on them.
+
+As the platform expands across social networks and accumulates historical audience data, it will evolve from a comment analysis tool into the central intelligence platform creators rely on to understand their communities, shape their content strategies, strengthen audience relationships, and grow sustainable businesses.
