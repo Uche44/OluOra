@@ -91,8 +91,8 @@ export default function Navbar() {
           <Image
             src="/icons/logo.png"
             alt="OluOra logo"
-            width={28}
-            height={28}
+            width={48}
+            height={48}
             className="w-7 h-7 object-contain flex-shrink-0"
           />
           <span className="font-playfair text-[1.4rem] font-bold text-primary tracking-tight leading-none">

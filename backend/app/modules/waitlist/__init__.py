@@ -1,0 +1,1 @@
+# Waitlist module package initialization

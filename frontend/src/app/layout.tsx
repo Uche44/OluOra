@@ -40,6 +40,9 @@ export const metadata: Metadata = {
     title: "OluOra - Audience Intelligence for Creators",
     description: "Transform thousands of comments into actionable insights.",
   },
+  icons: {
+    icon: "/icons/logo.png",
+  },
 };
 
 export default function RootLayout({
