@@ -16,12 +16,12 @@ The objective is to produce production-quality, maintainable, consistent, and fu
 
 # General Principles
 
-* Build production-ready code only.
-* Prefer simplicity over cleverness.
-* Never over-engineer the MVP.
-* Follow the project documentation before making implementation decisions.
-* Keep the codebase clean, modular, and scalable.
-* Favor readability and maintainability over writing fewer lines of code.
+- Build production-ready code only.
+- Prefer simplicity over cleverness.
+- Never over-engineer the MVP.
+- Follow the project documentation before making implementation decisions.
+- Keep the codebase clean, modular, and scalable.
+- Favor readability and maintainability over writing fewer lines of code.
 
 ---
 
@@ -31,11 +31,12 @@ The entire project **must be broken into 25 independent milestones**.
 
 Each milestone must:
 
-* Deliver one complete feature or subsystem.
-* Be fully functional on its own.
-* Be independently testable.
-* Not leave partially implemented functionality.
-* Integrate cleanly with previous milestones.
+- Deliver one complete feature or subsystem.
+- Be fully functional on its own.
+- Be independently testable.
+- Not leave partially implemented functionality.
+- Integrate cleanly with previous milestones.
+- Always run `npm run build` and `npm run lint` for frontend changes.
 
 **Do not begin the next milestone automatically.**
 
@@ -74,21 +75,21 @@ Backend responses **must always match frontend expectations**.
 
 This includes:
 
-* Response shape
-* Property names
-* Data types
-* Nullable fields
-* Pagination format
-* Error format
+- Response shape
+- Property names
+- Data types
+- Nullable fields
+- Pagination format
+- Error format
 
 The backend is not allowed to arbitrarily change API contracts.
 
 If a contract change is necessary:
 
-* Update the API specification.
-* Update the frontend.
-* Update backend implementation.
-* Keep everything synchronized.
+- Update the API specification.
+- Update the frontend.
+- Update backend implementation.
+- Keep everything synchronized.
 
 ---
 
@@ -96,19 +97,19 @@ If a contract change is necessary:
 
 Every endpoint must:
 
-* Follow REST conventions.
-* Return standardized responses.
-* Validate input.
-* Verify authentication.
-* Verify resource ownership.
-* Return proper HTTP status codes.
+- Follow REST conventions.
+- Return standardized responses.
+- Validate input.
+- Verify authentication.
+- Verify resource ownership.
+- Return proper HTTP status codes.
 
 Never expose:
 
-* Internal exceptions
-* Stack traces
-* Database errors
-* Secrets
+- Internal exceptions
+- Stack traces
+- Database errors
+- Secrets
 
 ---
 
@@ -118,15 +119,15 @@ Never use ambiguous types.
 
 Always use:
 
-* TypeScript interfaces/types on the frontend.
-* Pydantic schemas on the backend.
-* Strong typing in Python.
+- TypeScript interfaces/types on the frontend.
+- Pydantic schemas on the backend.
+- Strong typing in Python.
 
 Avoid:
 
-* `any`
-* untyped dictionaries
-* implicit data structures
+- `any`
+- untyped dictionaries
+- implicit data structures
 
 ---
 
@@ -150,20 +151,20 @@ Each layer has one responsibility.
 
 Frontend
 
-* UI
-* State
-* User interactions
+- UI
+- State
+- User interactions
 
 Backend
 
-* Business logic
-* Authentication
-* AI orchestration
-* Data persistence
+- Business logic
+- Authentication
+- AI orchestration
+- Data persistence
 
 Database
 
-* Data storage
+- Data storage
 
 Never mix responsibilities.
 
@@ -175,11 +176,11 @@ Every milestone must include appropriate testing.
 
 Before completion, verify:
 
-* Feature works as expected.
-* Existing functionality is unaffected.
-* No runtime errors.
-* No TypeScript errors.
-* No Python linting or syntax errors.
+- Feature works as expected.
+- Existing functionality is unaffected.
+- No runtime errors.
+- No TypeScript errors.
+- No Python linting or syntax errors.
 
 A milestone is not complete until it has been tested.
 
@@ -189,12 +190,12 @@ A milestone is not complete until it has been tested.
 
 Every implementation should:
 
-* Follow existing project conventions.
-* Be modular.
-* Avoid unnecessary abstraction.
-* Avoid duplicated code.
-* Use meaningful names.
-* Include comments only where necessary.
+- Follow existing project conventions.
+- Be modular.
+- Avoid unnecessary abstraction.
+- Avoid duplicated code.
+- Use meaningful names.
+- Include comments only where necessary.
 
 Write code that another engineer can easily understand.
 
@@ -220,9 +221,9 @@ Never modify production schema manually.
 
 Always:
 
-* Use foreign keys.
-* Use indexes where appropriate.
-* Preserve referential integrity.
+- Use foreign keys.
+- Use indexes where appropriate.
+- Preserve referential integrity.
 
 Avoid duplicate data whenever possible.
 
@@ -264,11 +265,11 @@ Never trust client input.
 
 Always:
 
-* Validate requests.
-* Authenticate users.
-* Verify ownership.
-* Sanitize user-generated content.
-* Protect secrets.
+- Validate requests.
+- Authenticate users.
+- Verify ownership.
+- Sanitize user-generated content.
+- Protect secrets.
 
 Never hardcode credentials or API keys.
 
@@ -300,9 +301,9 @@ Avoid unrelated changes in the same commit.
 
 When introducing a new feature:
 
-* Update relevant documentation if needed.
-* Keep API specifications synchronized.
-* Keep architectural documentation accurate.
+- Update relevant documentation if needed.
+- Keep API specifications synchronized.
+- Keep architectural documentation accurate.
 
 Documentation should evolve alongside the codebase.
 
@@ -312,14 +313,14 @@ Documentation should evolve alongside the codebase.
 
 Before requesting approval to proceed, confirm that:
 
-* All acceptance criteria are complete.
-* Feature is fully functional.
-* Tests pass.
-* No linting errors exist.
-* No type errors exist.
-* API contract is respected.
-* Documentation is updated if required.
-* Code follows project conventions.
+- All acceptance criteria are complete.
+- Feature is fully functional.
+- Tests pass.
+- No linting errors exist.
+- No type errors exist.
+- API contract is respected.
+- Documentation is updated if required.
+- Code follows project conventions.
 
 Only after all checks pass should permission be requested for the next milestone.
 
@@ -327,14 +328,14 @@ Only after all checks pass should permission be requested for the next milestone
 
 # Non-Negotiable Rules
 
-* Never break existing functionality.
-* Never leave incomplete implementations.
-* Never skip testing.
-* Never ignore errors or warnings.
-* Never change API contracts without updating both frontend and backend.
-* Never introduce unnecessary dependencies.
-* Never implement features outside the current milestone.
-* Never proceed to the next milestone without explicit user approval.
+- Never break existing functionality.
+- Never leave incomplete implementations.
+- Never skip testing.
+- Never ignore errors or warnings.
+- Never change API contracts without updating both frontend and backend.
+- Never introduce unnecessary dependencies.
+- Never implement features outside the current milestone.
+- Never proceed to the next milestone without explicit user approval.
 
 ---
 
@@ -344,7 +345,7 @@ Every decision should move OluOra toward becoming a robust, scalable audience in
 
 When faced with multiple implementation options:
 
-* Choose the simplest solution that satisfies the requirements.
-* Prioritize maintainability over cleverness.
-* Optimize for developer experience and long-term scalability.
-* Deliver complete, production-ready milestones rather than partially finished features.
+- Choose the simplest solution that satisfies the requirements.
+- Prioritize maintainability over cleverness.
+- Optimize for developer experience and long-term scalability.
+- Deliver complete, production-ready milestones rather than partially finished features.

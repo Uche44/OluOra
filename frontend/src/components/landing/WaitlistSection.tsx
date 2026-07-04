@@ -67,7 +67,7 @@ export default function WaitlistSection() {
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] as const }}
           className="relative rounded-3xl overflow-hidden px-8 py-16 lg:px-16 text-center"
           style={{
             background:
