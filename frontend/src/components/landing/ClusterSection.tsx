@@ -33,7 +33,7 @@ export default function ClusterSection() {
 
   return (
     <section
-      id="methodology"
+      id="about"
       ref={ref}
       className="py-24 lg:py-32 bg-surface-container-low/50"
     >
@@ -45,7 +45,7 @@ export default function ClusterSection() {
               alt="Audience Clustering Visual"
               width={500}
               height={500}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover rounded-[10px]"
             />
           </div>
 

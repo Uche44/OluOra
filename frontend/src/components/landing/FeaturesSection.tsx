@@ -45,7 +45,7 @@ export default function FeaturesSection() {
 
   return (
     <section
-      id="solutions"
+      id="solution"
       ref={ref}
       className="py-24 lg:py-32"
     >
