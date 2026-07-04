@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str
     RESEND_FROM_EMAIL: str
 
+    # JWT Authentication
+    JWT_SECRET: str = "secret-key-change-in-production-32chars"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
     # CORS Origins (comma-separated string in env)
     CORS_ORIGINS: str = "http://localhost:3000"
 
