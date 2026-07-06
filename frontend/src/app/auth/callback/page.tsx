@@ -1,0 +1,141 @@
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ShieldAlert, Sparkles, CheckCircle2 } from "lucide-react";
+
+// Red YouTube brand logo SVG to replace missing lucide-react exports
+const YoutubeLogo = ({ className = "w-6 h-6" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.107C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.388.511a3.002 3.002 0 0 0-2.11 2.107C0 8.053 0 12 0 12s0 3.947.502 5.837a3.003 3.003 0 0 0 2.11 2.107c1.883.511 9.388.511 9.388.511s7.505 0 9.388-.511a3.002 3.002 0 0 0 2.11-2.107C24 15.947 24 12 24 12s0-3.947-.502-5.837z" fill="#FF0000"/>
+    <path d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z" fill="#FFFFFF"/>
+  </svg>
+);
+
+function CallbackHandler() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState("Authenticating...");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const code = searchParams.get("code");
+    if (!code) {
+      setError("Authorization code is missing from redirect URL.");
+      return;
+    }
+
+    const exchangeCode = async () => {
+      try {
+        setStatus("Verifying Google credentials...");
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${apiUrl}/api/v1/auth/google/callback`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ code }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.detail || "OAuth token exchange handshake failed");
+        }
+
+        const data = await res.json();
+        
+        setStatus("Syncing workspace details...");
+        
+        // Save security tokens and profile to browser session cache
+        localStorage.setItem("access_token", data.access_token);
+        localStorage.setItem("refresh_token", data.refresh_token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+
+        setStatus("Authentication complete!");
+        
+        // Redirect to creator dashboard panel
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 800);
+      } catch (err: any) {
+        setError(err.message || "Failed to process Google sign in redirect callback.");
+      }
+    };
+
+    exchangeCode();
+  }, [searchParams, router]);
+
+  if (error) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md bg-white border border-error-container rounded-3xl p-8 shadow-xl text-center flex flex-col items-center gap-6"
+      >
+        <div className="w-16 h-16 rounded-full bg-error-container/20 flex items-center justify-center text-error">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <h2 className="font-playfair text-2xl font-bold text-primary">Login Failed</h2>
+          <p className="text-sm text-on-surface-variant font-literata leading-relaxed">
+            {error}
+          </p>
+        </div>
+        <Link 
+          href="/login" 
+          className="w-full py-3 bg-primary text-on-primary font-literata text-sm font-medium rounded-full hover:bg-primary-container transition-colors duration-150"
+        >
+          Return to Sign In
+        </Link>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-md bg-white border border-outline-variant/20 rounded-3xl p-8 shadow-xl text-center flex flex-col items-center gap-6"
+    >
+      {/* Premium loader spinner */}
+      <div className="relative w-16 h-16 flex items-center justify-center">
+        <div className="absolute inset-0 rounded-full border-4 border-primary-container/10 border-t-primary animate-spin" />
+        <YoutubeLogo className="w-6 h-6" />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h3 className="font-playfair text-xl font-bold text-primary">Creating Session</h3>
+        <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant font-literata">
+          <Sparkles className="w-4 h-4 text-secondary-container" />
+          <span>{status}</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="w-full max-w-md bg-white border border-outline-variant/20 rounded-3xl p-8 shadow-xl text-center flex flex-col items-center gap-6">
+      <div className="relative w-16 h-16 flex items-center justify-center">
+        <div className="absolute inset-0 rounded-full border-4 border-primary-container/10 border-t-primary animate-spin" />
+        <YoutubeLogo className="w-6 h-6" />
+      </div>
+      <h3 className="font-playfair text-xl font-bold text-primary">Loading Auth Handler...</h3>
+    </div>
+  );
+}
+
+export default function CallbackPage() {
+  return (
+    <div className="min-h-screen relative flex items-center justify-center px-4 bg-surface bg-[radial-gradient(ellipse_at_top_right,_var(--color-primary-container),_transparent_60%)]">
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
+      
+      <Suspense fallback={<LoadingFallback />}>
+        <CallbackHandler />
+      </Suspense>
+    </div>
+  );
+}

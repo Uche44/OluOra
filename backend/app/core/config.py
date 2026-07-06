@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str
     RESEND_FROM_EMAIL: str
 
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+    GOOGLE_REDIRECT_URI: str
+
     # JWT Authentication
     JWT_SECRET: str = "secret-key-change-in-production-32chars"
     JWT_ALGORITHM: str = "HS256"
