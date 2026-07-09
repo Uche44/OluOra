@@ -70,7 +70,7 @@ Ensure these variables are set in your backend hosting console:
 | `DEBUG` | Toggle debug output | `false` |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://user:password@host:port/dbname` |
 | `RESEND_API_KEY` | Resend API key for waitlist emails | `re_...` |
-| `RESEND_FROM_EMAIL` | Deployed/Verified sender address | `onboarding@resend.dev` or custom domain |
+| `RESEND_FROM_EMAIL` | Deployed/Verified sender address | `hello@mailing.useoluora.xyz` |
 | `CORS_ORIGINS` | Deployed frontend origin (allows CORS queries) | `https://your-frontend.vercel.app` |
 | `JWT_SECRET` | Cryptographic secret for signing JWT cookies | *(Generate a random 32-character hex string)* |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID | `your-google-client-id.apps.googleusercontent.com` |

@@ -56,71 +56,76 @@ class WaitlistService:
             "Content-Type": "application/json"
         }
         
-        # Email HTML layout using the OluOra brand design system (Deep Forest Green, editorial font literals)
+        # Email HTML layout using the OluOra brand design system (Deep Forest Green, Gold, Cream)
+        # Email HTML layout using the OluOra brand design system (Deep Forest Green, Gold, Cream)
         html_content = f"""
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,300..600&family=Playfair+Display:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
             <style>
                 body {{
-                    font-family: Georgia, serif;
-                    background-color: #fcf9f8;
-                    color: #1b1c1c;
+                    font-family: 'Literata', Georgia, serif;
+                    background-color: #FDFCF9;
                     margin: 0;
                     padding: 40px 20px;
                 }}
                 .container {{
                     max-width: 580px;
                     margin: 0 auto;
-                    background-color: #ffffff;
-                    border: 1px solid #eae7e7;
+                    background-color: #0B3D2E;
+                    border: none;
                     border-radius: 16px;
                     padding: 40px;
-                    box-shadow: 0 4px 12px rgba(0, 38, 27, 0.03);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
                 }}
-                .logo {{
-                    font-family: Georgia, serif;
-                    font-size: 24px;
-                    font-weight: bold;
-                    color: #00261b;
-                    margin-bottom: 30px;
-                    letter-spacing: -0.02em;
+                .logo-img {{
+                    display: block;
+                    margin-bottom: 20px;
+                    border-radius: 8px;
                 }}
                 h1 {{
-                    font-family: Georgia, serif;
-                    font-size: 22px;
-                    color: #00261b;
+                    font-family: 'Playfair Display', Georgia, serif;
+                    font-size: 24px;
+                    color: #FFEFCC;
                     line-height: 1.3;
                     margin-top: 0;
+                    font-weight: 700;
                 }}
                 p {{
+                    font-family: 'Literata', Georgia, serif;
                     font-size: 15px;
                     line-height: 1.6;
-                    color: #414944;
+                    color: #FDFCF9;
                     margin-bottom: 24px;
                 }}
                 .divider {{
                     height: 1px;
-                    background-color: #eae7e7;
+                    background-color: #0B3D2E;
+                    opacity: 0.15;
                     margin: 30px 0;
                 }}
                 .footer {{
+                    font-family: 'Literata', Georgia, serif;
                     font-size: 12px;
-                    color: #717974;
+                    color: #FFEFCC;
+                    opacity: 0.8;
                     line-height: 1.5;
                 }}
             </style>
         </head>
         <body>
             <div class="container">
-                <div class="logo">OluOra</div>
-                <h1>You're on the list.</h1>
-                <p>Thank you for requesting early access to OluOra. We are building the future of audience intelligence for professional creators, helping you distill complex comment sections into actionable content strategies.</p>
+                <img src="https://useoluora.xyz/icons/logo.png" alt="OluOra Logo" width="40" height="40" class="logo-img">
+                <h1>Welcome to OluOra's Waitlist!</h1>
+                <p>Thank you for requesting early access to OluOra. We are building the future of audience intelligence for professional creators, helping you distill bulky comment sections into actionable content strategies.</p>
                 <p>We will notify you as soon as your invite is ready.</p>
                 <div class="divider"></div>
                 <div class="footer">
-                    OluOra Intelligence &bull; Private Beta<br>
+                    OluOra &bull; Launching Soon<br>
                     If you did not request this invite, you can safely ignore this email.
                 </div>
             </div>
@@ -129,11 +134,29 @@ class WaitlistService:
         """
 
         payload = {
-            "from": settings.RESEND_FROM_EMAIL,
+            "from": f"OluOra <{settings.RESEND_FROM_EMAIL}>",
+            "reply_to": settings.RESEND_FROM_EMAIL,
             "to": email,
-            "subject": "Welcome to the OluOra Waitlist",
+            "subject": "You're on the list!",
             "html": html_content,
-            "text": "Thank you for joining the OluOra waitlist. We will notify you as soon as your invite is ready."
+            # Plain-text version is important for spam filters — always keep this in sync with the HTML
+            "text": (
+                "OluOra — Welcome to the Waitlist!\n\n"
+                "Thank you for requesting early access to OluOra.\n\n"
+                "We are building the future of audience intelligence for professional creators, "
+                "helping you distill bulky comment sections into actionable content strategies.\n\n"
+                "We will notify you as soon as your invite is ready.\n\n"
+                "—\n"
+                "OluOra • Launching Soon\n"
+                "If you did not request this invite, you can safely ignore this email."
+            ),
+            "headers": {
+                # Tells email clients this is a legitimate mailing list with a clear unsubscribe signal
+                "List-Unsubscribe": f"<mailto:{settings.RESEND_FROM_EMAIL}?subject=unsubscribe>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                # Identifies the sending software — some spam filters weight this positively
+                "X-Mailer": "OluOra Waitlist Mailer"
+            }
         }
 
         async with httpx.AsyncClient(timeout=10.0) as client:
