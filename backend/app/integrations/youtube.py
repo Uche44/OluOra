@@ -89,3 +89,50 @@ async def fetch_videos_metadata(access_token: str, video_ids: list[str]) -> list
                 raise
                 
     return all_video_details
+
+async def fetch_comment_threads(
+    access_token: str,
+    video_id: str,
+    max_results: int = 100,
+    page_token: str | None = None
+) -> dict:
+    """
+    Fetch a page of comment threads for a specific video from YouTube API.
+    Uses part=snippet,replies to retrieve top-level comments and their inline replies.
+    """
+    url = "https://www.googleapis.com/youtube/v3/commentThreads"
+    params = {
+        "part": "snippet,replies",
+        "videoId": video_id,
+        "maxResults": min(max_results, 100),
+        "order": "time"  # Sort comments by time descending (newest first)
+    }
+    if page_token:
+        params["pageToken"] = page_token
+        
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            response = await client.get(url, params=params, headers=headers)
+            if response.status_code != 200:
+                logger.error(f"Failed to fetch YouTube comment threads: {response.status_code} - {response.text}")
+                # Check for commentsDisabled reason
+                try:
+                    response_json = response.json()
+                    error_info = response_json.get("error", {})
+                    errors = error_info.get("errors", [])
+                    for err in errors:
+                        if err.get("reason") == "commentsDisabled":
+                            raise Exception("COMMENTS_DISABLED")
+                except ValueError:
+                    pass
+                raise Exception("YouTube API request failed while fetching comment threads")
+                
+            return response.json()
+        except Exception as e:
+            if str(e) == "COMMENTS_DISABLED":
+                raise
+            logger.error(f"Error fetching YouTube comment threads: {e}")
+            raise
+

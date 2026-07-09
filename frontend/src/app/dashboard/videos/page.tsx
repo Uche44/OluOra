@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, startTransition } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { authedFetch } from "@/lib/api";
 import { 
   Eye, 
   MessageSquare, 
@@ -12,8 +13,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  Filter,
-  Check
+  AlertTriangle
 } from "lucide-react";
 
 interface VideoItem {
@@ -46,6 +46,7 @@ export default function VideosPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncCount, setSyncCount] = useState<number | null>(null);
   const [analyzingVideoId, setAnalyzingVideoId] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Debounce search query
   useEffect(() => {
@@ -56,10 +57,9 @@ export default function VideosPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const fetchVideos = async () => {
-    setLoading(true);
+  const fetchVideos = useCallback(async () => {
+    setTimeout(() => setLoading(true), 0);
     try {
-      const token = localStorage.getItem("access_token");
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       
       let url = `${apiUrl}/api/v1/videos?page=${currentPage}&limit=6&sort=${sortBy}`;
@@ -70,11 +70,7 @@ export default function VideosPage() {
         url += `&status=${statusTab}`;
       }
 
-      const res = await fetch(url, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+      const res = await authedFetch(url);
       if (res.ok) {
         const payload = await res.json();
         setVideos(payload.data || []);
@@ -83,26 +79,25 @@ export default function VideosPage() {
     } catch (e) {
       console.error("Failed to load videos from backend", e);
     } finally {
-      setLoading(false);
+      setTimeout(() => setLoading(false), 0);
     }
-  };
+  }, [currentPage, statusTab, sortBy, debouncedSearch]);
 
   useEffect(() => {
-    fetchVideos();
-  }, [currentPage, statusTab, sortBy, debouncedSearch]);
+    const timer = setTimeout(() => {
+      fetchVideos();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchVideos]);
 
   const handleSync = async () => {
     setSyncing(true);
     setSyncCount(null);
     try {
-      const token = localStorage.getItem("access_token");
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       
-      const res = await fetch(`${apiUrl}/api/v1/youtube/sync?limit=24`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+      const res = await authedFetch(`${apiUrl}/api/v1/youtube/sync?limit=24`, {
+        method: "POST"
       });
       if (res.ok) {
         const data = await res.json();
@@ -116,15 +111,54 @@ export default function VideosPage() {
     }
   };
 
-  const handleAnalyze = (videoId: string) => {
-    // Simulates comments sync & AI cluster generation locally for the MVP
+  const handleAnalyze = async (videoId: string) => {
     setAnalyzingVideoId(videoId);
-    setTimeout(() => {
-      setVideos(prev => 
-        prev.map(v => v.id === videoId ? { ...v, sync_status: "completed" } : v)
-      );
+    setSyncResult(null);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      
+      const res = await authedFetch(`${apiUrl}/api/v1/videos/${videoId}/comments/sync`, {
+        method: "POST"
+      });
+      
+      const payload = await res.json();
+      
+      if (res.ok && payload.success) {
+        const syncedCount = payload.data?.synced_count ?? 0;
+        const newStatus = payload.data?.sync_status ?? "completed";
+        
+        setVideos(prev => 
+          prev.map(v => v.id === videoId ? { ...v, sync_status: newStatus, last_synced_at: new Date().toISOString() } : v)
+        );
+        setSyncResult({
+          success: true,
+          message: `Successfully synced comments! ${syncedCount} new comments added.`
+        });
+      } else {
+        const errMsg = payload.detail?.message || "Failed to synchronize comments.";
+        const errCode = payload.detail?.code;
+        
+        const newStatus = errCode === "COMMENTS_DISABLED" || errMsg.includes("disabled") ? "disabled" : "pending";
+        if (newStatus === "disabled") {
+          setVideos(prev => 
+            prev.map(v => v.id === videoId ? { ...v, sync_status: "disabled" } : v)
+          );
+        }
+        
+        setSyncResult({
+          success: false,
+          message: `Sync failed: ${errMsg}`
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      setSyncResult({
+        success: false,
+        message: "A network error occurred while connecting to the sync service."
+      });
+    } finally {
       setAnalyzingVideoId(null);
-    }, 2500);
+    }
   };
 
   const formatNumber = (num: number) => {
@@ -153,7 +187,7 @@ export default function VideosPage() {
       if (diffHrs > 0) return diffHrs === 1 ? "1 hour ago" : `${diffHrs} hours ago`;
       
       return "just now";
-    } catch (e) {
+     } catch {
       return dateString;
     }
   };
@@ -197,6 +231,42 @@ export default function VideosPage() {
             <button 
               onClick={() => setSyncCount(null)}
               className="text-emerald-600 hover:text-emerald-800 font-bold p-1 cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Comments Sync Status Banner */}
+      <AnimatePresence>
+        {syncResult !== null && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={cn(
+              "p-4 border rounded-2xl flex items-center justify-between font-literata text-xs shadow-sm",
+              syncResult.success 
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800" 
+                : "bg-amber-50 border-amber-200 text-amber-800"
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "w-5 h-5 rounded-full flex items-center justify-center font-bold",
+                syncResult.success ? "bg-emerald-200 text-emerald-800" : "bg-amber-200 text-amber-800"
+              )}>
+                {syncResult.success ? "✓" : "!"}
+              </div>
+              <span>{syncResult.message}</span>
+            </div>
+            <button 
+              onClick={() => setSyncResult(null)}
+              className={cn(
+                "font-bold p-1 cursor-pointer",
+                syncResult.success ? "text-emerald-600 hover:text-emerald-800" : "text-amber-600 hover:text-amber-800"
+              )}
             >
               Dismiss
             </button>
@@ -332,6 +402,11 @@ export default function VideosPage() {
                         <Sparkles className="w-2.5 h-2.5 text-secondary" />
                         <span>Analyzed</span>
                       </span>
+                    ) : video.sync_status === "disabled" ? (
+                      <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold font-literata px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                        <AlertTriangle className="w-2.5 h-2.5 text-amber-500" />
+                        <span>Disabled</span>
+                      </span>
                     ) : (
                       <span className="bg-white/95 text-primary border border-outline-variant/30 text-[10px] font-semibold font-literata px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
                         <Clock className="w-2.5 h-2.5 text-on-surface-variant" />
@@ -371,6 +446,13 @@ export default function VideosPage() {
                       <button className="w-full bg-surface-container hover:bg-surface-container-high text-primary font-literata text-xs font-semibold py-2.5 rounded-xl border border-primary/5 transition-colors cursor-pointer text-center">
                         View Insights
                       </button>
+                    ) : video.sync_status === "disabled" ? (
+                      <button 
+                        disabled 
+                        className="w-full bg-surface-container-low text-on-surface-variant/40 font-literata text-xs font-semibold py-2.5 rounded-xl border border-outline-variant/10 text-center cursor-not-allowed"
+                      >
+                        Sync Unavailable
+                      </button>
                     ) : (
                       <button
                         onClick={() => handleAnalyze(video.id)}
@@ -379,13 +461,13 @@ export default function VideosPage() {
                       >
                         {isAnalyzing ? (
                           <>
-                            <RotateCw className="w-3 h-3 animate-spin" />
-                            <span>Analyzing Comments...</span>
+                            <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Syncing Comments...</span>
                           </>
                         ) : (
                           <>
-                            <Sparkles className="w-3 h-3 text-secondary-container" />
-                            <span>Analyze</span>
+                            <RotateCw className="w-3.5 h-3.5 text-secondary-container" />
+                            <span>Sync Comments</span>
                           </>
                         )}
                       </button>

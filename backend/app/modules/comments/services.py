@@ -1,0 +1,165 @@
+import logging
+from datetime import datetime, timezone
+import uuid
+from sqlalchemy import select, desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.modules.youtube.models import Video
+from app.modules.comments.models import Comment
+from app.integrations import youtube
+
+logger = logging.getLogger(__name__)
+
+async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: str, max_comments_limit: int = 500) -> int:
+    """
+    Sync comments for a given video from YouTube API.
+    Implements incremental delta sync: stops when hitting a comment older than the newest stored comment.
+    """
+    # 1. Find the newest comment's published_at currently in the database
+    latest_stmt = (
+        select(Comment.published_at)
+        .where(Comment.video_id == video.id)
+        .order_by(desc(Comment.published_at))
+        .limit(1)
+    )
+    latest_result = await db.execute(latest_stmt)
+    latest_published_at = latest_result.scalar_one_or_none()
+    
+    # Ensure latest_published_at is timezone-aware
+    if latest_published_at and latest_published_at.tzinfo is None:
+        latest_published_at = latest_published_at.replace(tzinfo=timezone.utc)
+        
+    logger.info(f"Syncing comments for video {video.youtube_video_id}. Latest stored comment: {latest_published_at}")
+    
+    new_comments_count = 0
+    page_token = None
+    stop_sync = False
+    total_fetched = 0
+    
+    while not stop_sync and total_fetched < max_comments_limit:
+        # Fetch a page of comment threads
+        try:
+            response_data = await youtube.fetch_comment_threads(
+                access_token=access_token,
+                video_id=video.youtube_video_id,
+                max_results=100,
+                page_token=page_token
+            )
+        except Exception as e:
+            if str(e) == "COMMENTS_DISABLED":
+                video.sync_status = "disabled"
+                video.last_synced_at = datetime.now(timezone.utc)
+                db.add(video)
+                await db.commit()
+                logger.warning(f"Comments are disabled for video {video.youtube_video_id}")
+                return 0
+            logger.error(f"Failed to fetch comment threads: {e}")
+            raise
+            
+        items = response_data.get("items", [])
+        if not items:
+            break
+            
+        for item in items:
+            snippet = item.get("snippet", {})
+            top_level_wrapper = snippet.get("topLevelComment", {})
+            top_comment_id = top_level_wrapper.get("id")
+            top_snippet = top_level_wrapper.get("snippet", {})
+            
+            if not top_comment_id or not top_snippet:
+                continue
+                
+            published_at_str = top_snippet.get("publishedAt")
+            published_at = datetime.fromisoformat(published_at_str.replace("Z", "+00:00")) if published_at_str else datetime.now(timezone.utc)
+            
+            # Check if this comment is older than or equal to our newest stored comment
+            if latest_published_at and published_at <= latest_published_at:
+                logger.info(f"Reached comment older than latest sync timestamp: {published_at}. Stopping sync.")
+                stop_sync = True
+                break
+                
+            author_name = top_snippet.get("authorDisplayName", "Unknown")
+            author_profile_image = top_snippet.get("authorProfileImageUrl")
+            text = top_snippet.get("textDisplay", "")
+            like_count = int(top_snippet.get("likeCount", 0))
+            
+            # Check if comment already exists (failsafe)
+            exists_stmt = select(Comment).where(Comment.youtube_comment_id == top_comment_id)
+            exists_result = await db.execute(exists_stmt)
+            comment_db = exists_result.scalar_one_or_none()
+            
+            if not comment_db:
+                comment_db = Comment(
+                    video_id=video.id,
+                    youtube_comment_id=top_comment_id,
+                    author_name=author_name,
+                    author_profile_image=author_profile_image,
+                    text=text,
+                    like_count=like_count,
+                    published_at=published_at,
+                    parent_id=None
+                )
+                db.add(comment_db)
+                # Flush to generate UUID id for parent referencing
+                await db.flush()
+                new_comments_count += 1
+            else:
+                comment_db.like_count = like_count
+                comment_db.text = text
+                comment_db.author_name = author_name
+                comment_db.author_profile_image = author_profile_image
+                db.add(comment_db)
+                
+            total_fetched += 1
+            
+            # Process replies
+            replies_container = item.get("replies", {})
+            reply_items = replies_container.get("comments", [])
+            for reply_item in reply_items:
+                reply_id = reply_item.get("id")
+                reply_snippet = reply_item.get("snippet", {})
+                if not reply_id or not reply_snippet:
+                    continue
+                    
+                r_published_at_str = reply_snippet.get("publishedAt")
+                r_published_at = datetime.fromisoformat(r_published_at_str.replace("Z", "+00:00")) if r_published_at_str else datetime.now(timezone.utc)
+                r_author_name = reply_snippet.get("authorDisplayName", "Unknown")
+                r_author_profile_image = reply_snippet.get("authorProfileImageUrl")
+                r_text = reply_snippet.get("textDisplay", "")
+                r_like_count = int(reply_snippet.get("likeCount", 0))
+                
+                reply_exists_stmt = select(Comment).where(Comment.youtube_comment_id == reply_id)
+                reply_exists_result = await db.execute(reply_exists_stmt)
+                reply_db = reply_exists_result.scalar_one_or_none()
+                
+                if not reply_db:
+                    reply_db = Comment(
+                        video_id=video.id,
+                        youtube_comment_id=reply_id,
+                        author_name=r_author_name,
+                        author_profile_image=r_author_profile_image,
+                        text=r_text,
+                        like_count=r_like_count,
+                        published_at=r_published_at,
+                        parent_id=comment_db.id
+                    )
+                    db.add(reply_db)
+                    new_comments_count += 1
+                else:
+                    reply_db.like_count = r_like_count
+                    reply_db.text = r_text
+                    reply_db.author_name = r_author_name
+                    reply_db.author_profile_image = r_author_profile_image
+                    db.add(reply_db)
+                    
+        page_token = response_data.get("nextPageToken")
+        if not page_token:
+            break
+            
+    video.last_synced_at = datetime.now(timezone.utc)
+    if video.sync_status != "completed":
+        video.sync_status = "completed"
+    db.add(video)
+    await db.commit()
+    
+    logger.info(f"Comments sync completed. Synced {new_comments_count} comments.")
+    return new_comments_count

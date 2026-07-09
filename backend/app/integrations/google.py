@@ -12,7 +12,8 @@ def get_google_auth_url() -> str:
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
-        "https://www.googleapis.com/auth/youtube.readonly"
+        "https://www.googleapis.com/auth/youtube.readonly",
+        "https://www.googleapis.com/auth/youtube.force-ssl"
     ]
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,

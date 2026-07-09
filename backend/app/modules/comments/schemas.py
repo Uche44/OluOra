@@ -22,3 +22,14 @@ class CommentResponse(CommentBase):
 
     class Config:
         from_attributes = True
+
+class PaginationInfo(BaseModel):
+    page: int
+    limit: int
+    total: int
+    pages: int
+
+class CommentPaginationResponse(BaseModel):
+    data: list[CommentResponse]
+    pagination: PaginationInfo
+
