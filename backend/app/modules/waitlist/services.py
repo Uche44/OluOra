@@ -121,7 +121,7 @@ class WaitlistService:
             <div class="container">
                 <img src="https://useoluora.xyz/icons/logo.png" alt="OluOra Logo" width="40" height="40" class="logo-img">
                 <h1>Welcome to OluOra's Waitlist!</h1>
-                <p>Thank you for requesting early access to OluOra. We are building the future of audience intelligence for professional creators, helping you distill complex comment sections into actionable content strategies.</p>
+                <p>Thank you for requesting early access to OluOra. We are building the future of audience intelligence for professional creators, helping you distill bulky comment sections into actionable content strategies.</p>
                 <p>We will notify you as soon as your invite is ready.</p>
                 <div class="divider"></div>
                 <div class="footer">
