@@ -50,7 +50,7 @@ export default function HeroSection() {
               className="font-playfair text-[2.75rem] sm:text-[3.25rem] lg:text-[3.75rem] font-bold text-on-surface leading-[1.08] tracking-[-0.02em] mb-6"
             >
               Know exactly what your{" "}
-              <em className="not-italic text-primary">audience wants </em> - 
+              <em className="not-italic text-primary">audience wants </em> -
               without reading thousands of comments.
             </motion.h1>
 
@@ -63,8 +63,8 @@ export default function HeroSection() {
               className="font-literata text-[1.0625rem] text-on-surface-variant leading-[1.65] mb-8 max-w-[520px]"
             >
               OluOra distills the chaotic sea of creator-audience interaction
-              into crystal-clear actionable insights. We provide the
-              intelligence; you provide the vision.
+              into crystal-clear actionable insights.
+              <br /> You provide the data, we provide the intelligence.
             </motion.p>
 
             {/* CTAs */}

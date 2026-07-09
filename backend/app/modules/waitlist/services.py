@@ -135,10 +135,28 @@ class WaitlistService:
 
         payload = {
             "from": f"OluOra <{settings.RESEND_FROM_EMAIL}>",
+            "reply_to": settings.RESEND_FROM_EMAIL,
             "to": email,
             "subject": "You're on the list!",
             "html": html_content,
-            "text": "Thank you for joining the waitlist. We will notify you as soon as your invite is ready."
+            # Plain-text version is important for spam filters — always keep this in sync with the HTML
+            "text": (
+                "OluOra — Welcome to the Waitlist!\n\n"
+                "Thank you for requesting early access to OluOra.\n\n"
+                "We are building the future of audience intelligence for professional creators, "
+                "helping you distill bulky comment sections into actionable content strategies.\n\n"
+                "We will notify you as soon as your invite is ready.\n\n"
+                "—\n"
+                "OluOra • Launching Soon\n"
+                "If you did not request this invite, you can safely ignore this email."
+            ),
+            "headers": {
+                # Tells email clients this is a legitimate mailing list with a clear unsubscribe signal
+                "List-Unsubscribe": f"<mailto:{settings.RESEND_FROM_EMAIL}?subject=unsubscribe>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                # Identifies the sending software — some spam filters weight this positively
+                "X-Mailer": "OluOra Waitlist Mailer"
+            }
         }
 
         async with httpx.AsyncClient(timeout=10.0) as client:
