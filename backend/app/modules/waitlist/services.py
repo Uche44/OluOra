@@ -69,7 +69,7 @@ class WaitlistService:
             <style>
                 body {{
                     font-family: 'Literata', Georgia, serif;
-                    background-color: #0B3D2E
+                    background-color: #FDFCF9;
                     margin: 0;
                     padding: 40px 20px;
                 }}
