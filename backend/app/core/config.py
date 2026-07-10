@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # AI Integrations
+    GROQ_API_KEY: str = ""
+    HF_API_KEY: str = ""
+    HF_EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
+
     # CORS Origins (comma-separated string in env)
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
 
