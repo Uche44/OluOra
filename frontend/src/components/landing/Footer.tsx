@@ -70,7 +70,7 @@ export default function Footer() {
             {[
               { label: "Privacy Policy", href: "#privacy" },
               { label: "Terms of Service", href: "#terms" },
-              { label: "Contact Support", href: "#contact" },
+              { label: "Contact Support", href: "mailto:perp@ijuaalkiez.resend.app" },
             ].map((link) => (
               <Link
                 key={link.label}
