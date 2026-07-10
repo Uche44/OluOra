@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, User, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Map each nav link to the section ID it corresponds to.
@@ -12,7 +12,11 @@ import { cn } from "@/lib/utils";
 const navLinks = [
   { label: "Home", href: "/", sectionId: null },
   { label: "About", href: "#about", sectionId: "about" },
-  { label: "Solution", href: "#solution", sectionId: "solution" },
+  {
+    label: "What OluOra Does",
+    href: "#what-oluora-does",
+    sectionId: "what-oluora-does",
+  },
   { label: "Early Access", href: "#waitlist", sectionId: "waitlist" },
 ];
 
@@ -139,7 +143,7 @@ export default function Navbar() {
             id="nav-get-started"
             className="inline-flex items-center gap-2 bg-primary text-on-primary font-literata text-sm font-medium px-5 py-2.5 rounded-full hover:bg-primary-container transition-all duration-200 shadow-sm hover:shadow-md"
           >
-            Get Started
+            Join Waitlist
           </Link>
         </div>
 
@@ -190,7 +194,7 @@ export default function Navbar() {
               onClick={() => setMobileOpen(false)}
               className="flex justify-center items-center bg-primary text-on-primary font-literata text-sm font-medium px-5 py-3 rounded-full hover:bg-primary-container transition-colors"
             >
-              Get Started
+              Join Waitlist
             </Link>
           </motion.div>
         )}
