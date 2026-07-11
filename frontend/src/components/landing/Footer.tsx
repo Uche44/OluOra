@@ -64,13 +64,16 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-outline-variant/30 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="font-literata text-xs text-on-surface-variant">
-            © 2024 OluOra. All rights reserved.
+            © {new Date().getFullYear()} OluOra. All rights reserved.
           </p>
           <div className="flex items-center gap-5">
             {[
               { label: "Privacy Policy", href: "#privacy" },
               { label: "Terms of Service", href: "#terms" },
-              { label: "Contact Support", href: "#contact" },
+              {
+                label: "Contact Support",
+                href: "mailto:perp@ijuaalkiez.resend.app",
+              },
             ].map((link) => (
               <Link
                 key={link.label}

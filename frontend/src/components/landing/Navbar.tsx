@@ -12,7 +12,11 @@ import { cn } from "@/lib/utils";
 const navLinks = [
   { label: "Home", href: "/", sectionId: null },
   { label: "About", href: "#about", sectionId: "about" },
-  { label: "Solution", href: "#solution", sectionId: "solution" },
+  {
+    label: "What OluOra Does",
+    href: "#what-oluora-does",
+    sectionId: "what-oluora-does",
+  },
   { label: "Early Access", href: "#waitlist", sectionId: "waitlist" },
 ];
 

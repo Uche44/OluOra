@@ -45,7 +45,7 @@ export default function FeaturesSection() {
 
   return (
     <section
-      id="solution"
+      id="what-oluora-does"
       ref={ref}
       className="py-24 lg:py-32"
     >
@@ -121,7 +121,8 @@ export default function FeaturesSection() {
               </div>
               <p className="font-literata text-sm text-on-surface-variant leading-[1.65]">
                 See how your audience feels, reacts, and responds across every
-                video—revealing patterns that ordinary analytics can't uncover.
+                video, revealing patterns that ordinary analytics can&apos;t
+                uncover.
               </p>
             </div>
           </motion.div>
