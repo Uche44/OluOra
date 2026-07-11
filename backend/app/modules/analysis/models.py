@@ -39,6 +39,7 @@ class TopicCluster(Base):
 
     # Relationships
     analysis: Mapped["Analysis"] = relationship("Analysis", back_populates="topic_clusters")
+    comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="topic_cluster")
 
 class Insight(Base):
     __tablename__ = "insights"
