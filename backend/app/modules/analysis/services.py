@@ -368,3 +368,79 @@ async def generate_insights_for_analysis(
         raise e
 
 
+async def run_end_to_end_analysis(
+    analysis_id: uuid.UUID,
+    video_id: uuid.UUID,
+    google_token: str | None = None
+) -> None:
+    """
+    Background worker that executes the entire comments analysis pipeline:
+    1. Synchronizes YouTube comments for the video (if a token is provided).
+    2. Generates semantic embeddings for comments.
+    3. Clusters comments using KMeans.
+    4. Auto-titles clusters and generates structured insights via Groq.
+    """
+    from app.core.db import SessionLocal
+    from app.modules.comments.services import sync_comments_for_video
+    from app.modules.youtube.models import Video
+    from app.modules.analysis.models import Analysis
+
+    async with SessionLocal() as db:
+        # 1. Fetch the video
+        video_result = await db.execute(
+            select(Video).where(Video.id == video_id)
+        )
+        video = video_result.scalars().first()
+        if not video:
+            logger.error(f"Video {video_id} not found. Aborting analysis background task.")
+            # Set status to failed
+            analysis_result = await db.execute(
+                select(Analysis).where(Analysis.id == analysis_id)
+            )
+            analysis = analysis_result.scalars().first()
+            if analysis:
+                analysis.status = "failed"
+                analysis.error_message = f"Video {video_id} not found."
+                await db.commit()
+            return
+
+        try:
+            # Step A: Synchronize YouTube comments (if token provided)
+            if google_token:
+                logger.info(f"Syncing comments for video {video_id} in background...")
+                await sync_comments_for_video(db, video, google_token)
+
+            # Step B: Generate embeddings
+            logger.info(f"Generating embeddings for video {video_id} in background...")
+            embedded_count = await generate_embeddings_for_comments(db, video_id)
+
+            # Step C: Group comments via KMeans clustering
+            logger.info(f"Clustering comments for video {video_id} in background...")
+            await cluster_comments_for_analysis(db, analysis_id, video_id)
+
+            # Step D: Groq Insight Generation & Cluster Labeling
+            logger.info(f"Generating insights for analysis {analysis_id} in background...")
+            await generate_insights_for_analysis(db, analysis_id, video_id)
+
+            # Update final comments analyzed count
+            analysis_result = await db.execute(
+                select(Analysis).where(Analysis.id == analysis_id)
+            )
+            analysis_record = analysis_result.scalars().first()
+            if analysis_record:
+                analysis_record.comments_analyzed = embedded_count
+                await db.commit()
+
+        except Exception as e:
+            logger.exception(f"Background analysis task failed for analysis_id={analysis_id}: {e}")
+            analysis_result = await db.execute(
+                select(Analysis).where(Analysis.id == analysis_id)
+            )
+            analysis_record = analysis_result.scalars().first()
+            if analysis_record and analysis_record.status != "failed":
+                analysis_record.status = "failed"
+                analysis_record.error_message = str(e)
+                await db.commit()
+
+
+

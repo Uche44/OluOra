@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class CommentBase(BaseModel):
     youtube_comment_id: str
@@ -20,8 +20,7 @@ class CommentResponse(CommentBase):
     video_id: uuid.UUID
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PaginationInfo(BaseModel):
     page: int

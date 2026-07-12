@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { authedFetch } from "@/lib/api";
 import { 
@@ -443,9 +444,12 @@ export default function VideosPage() {
 
                     {/* Action buttons */}
                     {isAnalyzed ? (
-                      <button className="w-full bg-surface-container hover:bg-surface-container-high text-primary font-literata text-xs font-semibold py-2.5 rounded-xl border border-primary/5 transition-colors cursor-pointer text-center">
+                      <Link
+                        href={`/dashboard/videos/${video.id}`}
+                        className="w-full bg-surface-container hover:bg-surface-container-high text-primary font-literata text-xs font-semibold py-2.5 rounded-xl border border-primary/5 transition-colors cursor-pointer text-center block"
+                      >
                         View Insights
-                      </button>
+                      </Link>
                     ) : video.sync_status === "disabled" ? (
                       <button 
                         disabled 

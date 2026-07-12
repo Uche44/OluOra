@@ -157,3 +157,39 @@ async def test_get_videos_sorting_and_pagination(client: AsyncClient, db: AsyncS
     assert data["pagination"]["limit"] == 2
     assert data["pagination"]["total"] == 3
     assert data["pagination"]["pages"] == 2
+
+
+async def test_get_video_details_success(client: AsyncClient, db: AsyncSession):
+    user = await create_mock_user(db, "details_creator@gmail.com", "Details Creator")
+    channel = await create_mock_channel(db, user.id, "UC_details", "Details Channel")
+    video = await create_mock_video(db, channel.id, "v_details", "Video Details Title", "Awesome description", 1500, 15, "completed")
+
+    token = create_access_token({"sub": str(user.id)})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = await client.get(f"/api/v1/videos/{video.id}", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == str(video.id)
+    assert data["title"] == "Video Details Title"
+    assert data["description"] == "Awesome description"
+    assert data["view_count"] == 1500
+    assert data["comment_count"] == 15
+    assert data["sync_status"] == "completed"
+
+
+async def test_get_video_details_unauthorized(client: AsyncClient, db: AsyncSession):
+    response = await client.get(f"/api/v1/videos/{uuid.uuid4()}")
+    assert response.status_code == 401
+
+
+async def test_get_video_details_not_found(client: AsyncClient, db: AsyncSession):
+    user = await create_mock_user(db, "details_other@gmail.com", "Details Other")
+    token = create_access_token({"sub": str(user.id)})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = await client.get(f"/api/v1/videos/{uuid.uuid4()}", headers=headers)
+    assert response.status_code == 404
+    data = response.json()
+    assert data["detail"]["code"] == "VIDEO_NOT_FOUND"
+

@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
@@ -135,3 +136,41 @@ async def get_videos_list(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@videos_router.get("/{video_id}", status_code=status.HTTP_200_OK)
+async def get_video_details(
+    video_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Retrieves single video details owned by the creator."""
+    video_stmt = (
+        select(Video)
+        .join(Channel)
+        .where(Video.id == video_id, Channel.creator_id == current_user.id)
+    )
+    video_result = await db.execute(video_stmt)
+    video = video_result.scalars().first()
+    if not video:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "VIDEO_NOT_FOUND",
+                "message": "The requested video does not exist or you do not have permission to view it."
+            }
+        )
+    return {
+        "id": str(video.id),
+        "youtube_video_id": video.youtube_video_id,
+        "title": video.title,
+        "description": video.description,
+        "thumbnail_url": video.thumbnail_url,
+        "published_at": video.published_at.isoformat() if video.published_at else None,
+        "view_count": video.view_count,
+        "like_count": video.like_count,
+        "comment_count": video.comment_count,
+        "sync_status": video.sync_status,
+        "last_synced_at": video.last_synced_at.isoformat() if video.last_synced_at else None
+    }
+
