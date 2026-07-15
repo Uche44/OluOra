@@ -4,19 +4,19 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { 
-  LayoutGrid, 
-  Film, 
-  Lightbulb, 
-  Sparkles, 
-  Settings, 
-  Crown, 
-  HelpCircle, 
-  LogOut, 
-  Bell, 
+import {
+  LayoutGrid,
+  Film,
+  Lightbulb,
+  Sparkles,
+  Settings,
+  Crown,
+  HelpCircle,
+  LogOut,
+  Bell,
   Search,
   Menu,
-  X
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,12 +66,16 @@ export default function DashboardLayout({
     { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
     { label: "Videos", href: "/dashboard/videos", icon: Film },
     { label: "Insights", href: "/dashboard/insights", icon: Lightbulb },
-    { label: "Recommendations", href: "/dashboard/recommendations", icon: Sparkles },
+    {
+      label: "Recommendations",
+      href: "/dashboard/recommendations",
+      icon: Sparkles,
+    },
     { label: "Settings", href: "/dashboard/settings", icon: Settings },
   ];
 
   const searchPlaceholder = pathname.endsWith("/videos")
-    ? "Search your editorial library..."
+    ? "Search your video library..."
     : "Search analytics, insights or videos...";
 
   if (loading) {
@@ -79,7 +83,9 @@ export default function DashboardLayout({
       <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-12 h-12 border-4 border-primary/10 border-t-primary rounded-full animate-spin" />
-          <span className="font-literata text-sm text-on-surface-variant">Loading workspace...</span>
+          <span className="font-literata text-sm text-on-surface-variant">
+            Loading workspace...
+          </span>
         </div>
       </div>
     );
@@ -89,7 +95,10 @@ export default function DashboardLayout({
     <div className="h-full flex flex-col justify-between py-6 px-4">
       <div className="flex flex-col gap-8">
         {/* Brand Header */}
-        <Link href="/dashboard" className="flex items-center gap-2.5 px-3 select-none group">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2.5 px-3 select-none group"
+        >
           <Image
             src="/icons/logo.png"
             alt="OluOra Logo"
@@ -98,9 +107,11 @@ export default function DashboardLayout({
             className="w-8 h-8 object-contain flex-shrink-0 transition-transform group-hover:scale-105"
           />
           <div className="flex flex-col">
-            <span className="font-playfair text-xl font-bold text-primary leading-tight">OluOra</span>
+            <span className="font-playfair text-xl font-bold text-primary leading-tight">
+              OluOra
+            </span>
             <span className="text-[9px] text-on-surface-variant font-medium tracking-widest uppercase mt-0.5">
-              Editorial Intelligence
+              Creator Intelligence
             </span>
           </div>
         </Link>
@@ -119,10 +130,15 @@ export default function DashboardLayout({
                   "flex items-center gap-3 px-4 py-3 rounded-xl font-literata text-sm font-medium transition-all duration-150",
                   isActive
                     ? "bg-surface-container text-primary font-semibold shadow-sm"
-                    : "text-on-surface-variant hover:text-primary hover:bg-surface-container/50"
+                    : "text-on-surface-variant hover:text-primary hover:bg-surface-container/50",
                 )}
               >
-                <Icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-on-surface-variant")} />
+                <Icon
+                  className={cn(
+                    "w-4 h-4",
+                    isActive ? "text-primary" : "text-on-surface-variant",
+                  )}
+                />
                 <span>{item.label}</span>
               </Link>
             );
@@ -242,7 +258,7 @@ export default function DashboardLayout({
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           {/* Backdrop click closer */}
-          <div 
+          <div
             className="fixed inset-0 bg-primary/20 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
@@ -265,8 +281,18 @@ export default function DashboardLayout({
 // Simple fallback user icon
 function UserIcon({ className = "" }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+      />
     </svg>
   );
 }

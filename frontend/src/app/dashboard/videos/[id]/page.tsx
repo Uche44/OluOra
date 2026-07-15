@@ -1,63 +1,24 @@
 "use client";
 
-import { use, useEffect, useState, useCallback } from "react";
+import React, { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { authedFetch } from "@/lib/api";
-import { 
+import type { VideoDetails, AnalysisRun, TopicCluster, InsightItem, InsightsData } from "@/types/video-insights";
+import {
   ArrowLeft,
   Play,
   RotateCw,
   Sparkles,
-  TrendingUp,
   AlertTriangle,
-  Lightbulb,
   MessageSquare,
   HelpCircle,
-  Clock,
-  Heart
+  Heart,
+  Search,
+  X,
+  Check,
+  Rocket,
 } from "lucide-react";
-
-interface VideoDetails {
-  id: string;
-  youtube_video_id: string;
-  title: string;
-  description: string;
-  thumbnail_url: string;
-  published_at: string;
-  view_count: number;
-  like_count: number;
-  comment_count: number;
-  sync_status: string;
-}
-
-interface AnalysisRun {
-  id: string;
-  status: string;
-  comments_analyzed: number;
-  error_message: string | null;
-}
-
-interface TopicCluster {
-  id: string;
-  title: string;
-  summary: string;
-  size: number;
-  sentiment_score: number;
-}
-
-interface InsightItem {
-  id: string;
-  type: string;
-  title: string;
-  content: string;
-}
-
-interface InsightsData {
-  questions: InsightItem[];
-  pain_points: InsightItem[];
-  positive_themes: InsightItem[];
-}
 
 export default function VideoInsightsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: videoId } = use(params);
@@ -74,6 +35,51 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
 
   // Topic Explorer interactive state
   const [selectedClusterIndex, setSelectedClusterIndex] = useState<number>(0);
+
+  // Insights Section (Section 4) state
+  type InsightTab = "questions" | "pain_points" | "positive_themes";
+  const [activeTab, setActiveTab] = useState<InsightTab>("questions");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Content Recommendations (Section 3) state
+  type RecStatus = "none" | "planned" | "in_progress" | "dismissed";
+  type RecMeta = { status: RecStatus; title: string; content: string; videoId: string; videoTitle: string };
+  const LS_KEY = "olundi_recs";
+  const [recStatuses, setRecStatuses] = useState<Record<string, RecMeta>>({});
+  type RecFilterTab = "all" | "active" | "planned" | "dismissed";
+  const [recFilter, setRecFilter] = useState<RecFilterTab>("all");
+
+  // Load statuses from localStorage whenever recommendations change
+  const loadRecStatuses = (recs: InsightItem[], videoData: VideoDetails | null) => {
+    try {
+      const stored: Record<string, RecMeta> = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+      // Seed any newly seen recommendations that aren't in localStorage yet
+      recs.forEach(rec => {
+        if (!stored[rec.id]) {
+          stored[rec.id] = {
+            status: "none",
+            title: rec.title,
+            content: rec.content,
+            videoId: videoData?.id ?? "",
+            videoTitle: videoData?.title ?? "Unknown Video",
+          };
+        }
+      });
+      localStorage.setItem(LS_KEY, JSON.stringify(stored));
+      setRecStatuses(stored);
+    } catch {
+      // localStorage not available (SSR safety)
+    }
+  };
+
+  const setRecStatus = (recId: string, status: RecStatus) => {
+    setRecStatuses(prev => {
+      const updated = { ...prev, [recId]: { ...prev[recId], status } };
+      try { localStorage.setItem(LS_KEY, JSON.stringify(updated)); } catch { /* noop */ }
+      return updated;
+    });
+  };
+
 
   // Fetch functions
   const loadData = useCallback(async () => {
@@ -121,8 +127,9 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
           setInsights(insightsData);
         }
         if (recsRes.ok) {
-          const recsData = await recsRes.json();
+          const recsData: InsightItem[] = await recsRes.json();
           setRecommendations(recsData);
+          loadRecStatuses(recsData, videoData);
         }
       }
     } catch (err: any) {
@@ -242,13 +249,13 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
         </div>
         
         <h1 className="font-playfair text-3xl font-bold text-primary">
-          {isRunning ? "Analyzing Video Comments..." : "Editorial Intelligence Pending"}
+          {isRunning ? "Analyzing Video Comments..." : "Audience Insights Pending"}
         </h1>
         
         <p className="text-sm font-literata text-on-surface-variant leading-relaxed">
           {isRunning 
             ? "OluOra is currently fetching YouTube comments, generating semantic embeddings, and clustering viewer topics. This takes less than a minute."
-            : "Trigger an AI editorial report to automatically map viewer segments, emotional sentiments, FAQs, and content suggestions."}
+            : "Trigger an AI audience report to automatically map viewer segments, emotional sentiments, FAQs, and content suggestions."}
         </p>
 
         {isRunning && (
@@ -379,10 +386,10 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      {/* Section 1: Audience Interest Clusters */}
+      {/* Section 1: Audience Interest Themes */}
       <div className="flex flex-col gap-5">
         <h2 className="font-playfair text-xl font-bold text-primary border-b border-outline-variant/20 pb-3">
-          Audience Interest Clusters
+          Audience Interest Themes
         </h2>
         
         <div className="grid lg:grid-cols-3 gap-6 items-stretch">
@@ -391,11 +398,11 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
             <div className="flex flex-col gap-4">
               <span className="text-[10px] uppercase font-semibold tracking-wider text-on-primary-container inline-flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Editorial AI Summary</span>
+                <span>Audience AI Summary</span>
               </span>
               <p className="font-playfair text-lg italic leading-relaxed mt-2 font-medium">
                 &ldquo;{clusters.length > 0 
-                  ? `This audience is primarily interested in ${clusters[0].title.toLowerCase()} and ${clusters[1]?.title.toLowerCase() || 'tutorials'}, indicating key clusters of viewer interest.`
+                  ? `This audience is primarily interested in ${clusters[0].title.toLowerCase()} and ${clusters[1]?.title.toLowerCase() || 'tutorials'}, revealing the key themes driving viewer engagement.`
                   : "We are currently synthesizing your comment themes to construct a unified creator prompt roadmap."
                 }&rdquo;
               </p>
@@ -506,7 +513,7 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
           <div className="flex flex-col">
             <h3 className="font-playfair text-lg font-bold text-primary">Topic Explorer</h3>
             <p className="text-xs text-on-surface-variant font-literata mt-1">
-              Select clusters to explore specific viewer discussion details.
+              Select a theme to explore what your viewers are talking about.
             </p>
           </div>
 
@@ -668,7 +675,7 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
                   </motion.div>
                 ) : (
                   <span className="text-xs text-on-surface-variant/50 font-literata italic">
-                    No cluster selected. Hover or click bubble nodes.
+                    No theme selected. Hover or click a bubble to explore.
                   </span>
                 )}
               </AnimatePresence>
@@ -677,47 +684,248 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
           
           <span className="text-[9px] text-on-surface-variant/75 font-literata flex items-center gap-1 border-t border-outline-variant/10 pt-3">
             <span>ℹ</span>
-            <span>Clusters are size-mapped by comment mention frequency.</span>
+            <span>Each bubble represents a topic — larger bubbles = more comments about that topic.</span>
           </span>
         </div>
       </div>
 
-      {/* Section 3: Content Opportunities Grid */}
+      {/* Section 4: Audience Questions & Pain Points */}
+      {(insights.questions.length > 0 || insights.pain_points.length > 0 || insights.positive_themes.length > 0) && (() => {
+        const tabConfig: { key: InsightTab; label: string; icon: React.ReactNode; items: typeof insights.questions; accent: string; dotColor: string }[] = [
+          {
+            key: "questions",
+            label: "Questions",
+            icon: <HelpCircle className="w-3.5 h-3.5" />,
+            items: insights.questions,
+            accent: "bg-sky-50 border-sky-200/60 text-sky-900",
+            dotColor: "bg-sky-400",
+          },
+          {
+            key: "pain_points",
+            label: "Pain Points",
+            icon: <MessageSquare className="w-3.5 h-3.5" />,
+            items: insights.pain_points,
+            accent: "bg-rose-50 border-rose-200/60 text-rose-900",
+            dotColor: "bg-rose-400",
+          },
+          {
+            key: "positive_themes",
+            label: "What They Love",
+            icon: <Heart className="w-3.5 h-3.5" />,
+            items: insights.positive_themes,
+            accent: "bg-emerald-50 border-emerald-200/60 text-emerald-900",
+            dotColor: "bg-emerald-400",
+          },
+        ];
+
+        const activeConfig = tabConfig.find(t => t.key === activeTab)!;
+        const filtered = activeConfig.items.filter(
+          item =>
+            item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.content.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        return (
+          <div className="bg-white border border-outline-variant/10 rounded-3xl p-8 shadow-sm flex flex-col gap-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col">
+                <h2 className="font-playfair text-xl font-bold text-primary">Audience Questions &amp; Feedback</h2>
+                <p className="text-xs text-on-surface-variant font-literata mt-1">
+                  What your viewers are asking, struggling with, and loving.
+                </p>
+              </div>
+
+              {/* Search bar */}
+              <div className="relative flex-shrink-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-on-surface-variant/50" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search insights…"
+                  className="pl-8 pr-8 py-2 text-xs font-literata bg-surface-container border border-outline-variant/20 rounded-full focus:outline-none focus:ring-2 focus:ring-primary/20 w-52 transition"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 hover:text-on-surface-variant cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex items-center gap-2 border-b border-outline-variant/15 pb-4">
+              {tabConfig.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => { setActiveTab(tab.key); setSearchQuery(""); }}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold font-literata border transition-all cursor-pointer ${
+                    activeTab === tab.key
+                      ? tab.accent
+                      : "bg-transparent border-transparent text-on-surface-variant hover:bg-surface-container"
+                  }`}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                  <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    activeTab === tab.key ? "bg-white/60" : "bg-surface-container"
+                  }`}>
+                    {tab.items.length}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Cards grid */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab + searchQuery}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18 }}
+              >
+                {filtered.length > 0 ? (
+                  <>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {filtered.map(item => (
+                        <div
+                          key={item.id}
+                          className="flex gap-3 p-5 rounded-2xl border border-outline-variant/10 bg-surface-container-lowest hover:shadow-sm transition"
+                        >
+                          <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${activeConfig.dotColor}`} />
+                          <div className="flex flex-col gap-1">
+                            <p className="font-literata text-sm font-semibold text-on-surface leading-snug">
+                              {item.title}
+                            </p>
+                            <p className="font-literata text-xs text-on-surface-variant leading-relaxed">
+                              {item.content}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant/60 font-literata mt-4">
+                      Showing {filtered.length} of {activeConfig.items.length} {activeConfig.label.toLowerCase()}
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 py-12 text-center">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activeConfig.accent}`}>
+                      {activeConfig.icon}
+                    </div>
+                    <p className="font-literata text-sm text-on-surface-variant">
+                      {searchQuery
+                        ? `No ${activeConfig.label.toLowerCase()} match "${searchQuery}".`
+                        : `No ${activeConfig.label.toLowerCase()} were found for this analysis.`}
+                    </p>
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="text-xs font-semibold font-literata text-primary hover:underline cursor-pointer"
+                      >
+                        Clear search
+                      </button>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        );
+      })()}
+
+      {/* Section 3: Content Recommendations */}
       <div className="bg-white border border-outline-variant/10 rounded-3xl p-8 shadow-sm flex flex-col gap-6">
-        <div className="flex flex-col">
-          <h2 className="font-playfair text-xl font-bold text-primary">Content Opportunities</h2>
-          <p className="text-xs text-on-surface-variant font-literata mt-1">
-            Actionable outlines and ideas derived from subscriber suggestions.
-          </p>
+        {/* Header + filter */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col">
+            <h2 className="font-playfair text-xl font-bold text-primary">Content Opportunities</h2>
+            <p className="text-xs text-on-surface-variant font-literata mt-1">
+              AI-suggested ideas derived from subscriber conversations.
+            </p>
+          </div>
+
+          {/* Filter pills */}
+          {recommendations.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {(["all", "active", "planned", "dismissed"] as RecFilterTab[]).map(f => {
+                const counts: Record<RecFilterTab, number> = {
+                  all: recommendations.length,
+                  active: recommendations.filter(r => (recStatuses[r.id]?.status ?? "none") === "none").length,
+                  planned: recommendations.filter(r => ["planned","in_progress"].includes(recStatuses[r.id]?.status ?? "")).length,
+                  dismissed: recommendations.filter(r => (recStatuses[r.id]?.status ?? "none") === "dismissed").length,
+                };
+                const labels: Record<RecFilterTab, string> = { all: "All", active: "Unreviewed", planned: "Planned", dismissed: "Dismissed" };
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setRecFilter(f)}
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-semibold font-literata border transition cursor-pointer ${
+                      recFilter === f
+                        ? "bg-primary text-on-primary border-primary"
+                        : "bg-transparent border-outline-variant/20 text-on-surface-variant hover:bg-surface-container"
+                    }`}
+                  >
+                    {labels[f]}
+                    {counts[f] > 0 && <span className="ml-1 opacity-70">({counts[f]})</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 border-t border-outline-variant/20 pt-6">
-          {recommendations.length > 0 ? (
-            recommendations.slice(0, 3).map((rec, idx) => {
-              const isFirst = idx === 0;
-              const isSecond = idx === 1;
-              
-              let badge = "RECOMMENDED NEXT";
-              let badgeBg = "bg-amber-100/50 text-amber-900 border-amber-200/50";
-              
-              if (isSecond) {
-                badge = "EDUCATIONAL GAP";
-                badgeBg = "bg-emerald-100/50 text-emerald-900 border-emerald-200/50";
-              } else if (idx === 2) {
-                badge = "TREND ALERT";
-                badgeBg = "bg-indigo-100/50 text-indigo-900 border-indigo-200/50";
-              }
+        {/* Cards */}
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5 border-t border-outline-variant/20 pt-6">
+          {recommendations.length > 0 ? (() => {
+            const filtered = recommendations.filter(rec => {
+              const status = recStatuses[rec.id]?.status ?? "none";
+              if (recFilter === "active") return status === "none";
+              if (recFilter === "planned") return status === "planned" || status === "in_progress";
+              if (recFilter === "dismissed") return status === "dismissed";
+              return true;
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <div className="col-span-3 text-center py-10 font-literata text-xs text-on-surface-variant/60 italic">
+                  No recommendations match this filter.
+                </div>
+              );
+            }
+
+            return filtered.map((rec) => {
+              const status = recStatuses[rec.id]?.status ?? "none";
+              const isDismissed = status === "dismissed";
+
+              const statusConfig: Record<string, { label: string; color: string }> = {
+                none: { label: "", color: "" },
+                planned: { label: "Planned", color: "bg-amber-100 text-amber-800 border-amber-200" },
+                in_progress: { label: "In Progress", color: "bg-sky-100 text-sky-800 border-sky-200" },
+                dismissed: { label: "Dismissed", color: "bg-neutral-100 text-neutral-500 border-neutral-200" },
+              };
 
               return (
-                <div 
-                  key={rec.id} 
-                  className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-5 shadow-sm hover:shadow transition flex flex-col justify-between"
+                <div
+                  key={rec.id}
+                  className={`relative bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-5 shadow-sm flex flex-col justify-between transition ${
+                    isDismissed ? "opacity-40" : "hover:shadow"
+                  }`}
                 >
-                  <div className="flex flex-col gap-3">
-                    <span className={`text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full border self-start ${badgeBg}`}>
-                      {badge}
+                  {/* Status chip */}
+                  {status !== "none" && (
+                    <span className={`absolute top-3 right-3 text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full border ${statusConfig[status].color}`}>
+                      {statusConfig[status].label}
                     </span>
-                    <h4 className="font-playfair text-base font-bold text-primary mt-1">
+                  )}
+
+                  <div className="flex flex-col gap-3">
+                    <h4 className={`font-playfair text-base font-bold mt-1 pr-16 ${ isDismissed ? "line-through text-on-surface-variant" : "text-primary" }`}>
                       {rec.title}
                     </h4>
                     <p className="text-xs text-on-surface-variant font-literata leading-relaxed">
@@ -725,14 +933,53 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
                     </p>
                   </div>
 
-                  <button className="flex items-center gap-1.5 text-xs font-semibold font-literata text-[#735c00] hover:underline mt-6 self-start cursor-pointer">
-                    <span>{isFirst || isSecond ? "Generate Script Outline" : "Analyze Topic Search"}</span>
-                    <span>→</span>
-                  </button>
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 mt-5 pt-4 border-t border-outline-variant/10">
+                    {isDismissed ? (
+                      <button
+                        onClick={() => setRecStatus(rec.id, "none")}
+                        className="text-xs font-semibold font-literata text-primary hover:underline cursor-pointer"
+                      >
+                        Restore
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setRecStatus(rec.id, status === "planned" ? "none" : "planned")}
+                          title="Mark as Planned"
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold font-literata border transition cursor-pointer ${
+                            status === "planned"
+                              ? "bg-amber-100 text-amber-800 border-amber-300"
+                              : "bg-surface-container text-on-surface-variant border-outline-variant/20 hover:bg-amber-50 hover:text-amber-800"
+                          }`}
+                        >
+                          <Check className="w-3 h-3" /> Planned
+                        </button>
+                        <button
+                          onClick={() => setRecStatus(rec.id, status === "in_progress" ? "none" : "in_progress")}
+                          title="Mark as In Progress"
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold font-literata border transition cursor-pointer ${
+                            status === "in_progress"
+                              ? "bg-sky-100 text-sky-800 border-sky-300"
+                              : "bg-surface-container text-on-surface-variant border-outline-variant/20 hover:bg-sky-50 hover:text-sky-800"
+                          }`}
+                        >
+                          <Rocket className="w-3 h-3" /> In Progress
+                        </button>
+                        <button
+                          onClick={() => setRecStatus(rec.id, "dismissed")}
+                          title="Dismiss"
+                          className="ml-auto p-1.5 rounded-full text-on-surface-variant/40 hover:text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
-            })
-          ) : (
+            });
+          })() : (
             <div className="col-span-3 text-center py-10 font-literata text-xs text-on-surface-variant/60 italic">
               No recommendations available for this run.
             </div>

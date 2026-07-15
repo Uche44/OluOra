@@ -200,7 +200,7 @@ export default function VideosPage() {
         <div className="flex flex-col">
           <h1 className="font-playfair text-3xl font-bold text-primary">Video Intelligence</h1>
           <p className="text-on-surface-variant font-literata text-sm mt-1 max-w-xl leading-relaxed">
-            Manage your content library and harness AI-driven editorial insights for every upload.
+            Manage your content library and harness AI-driven audience insights for every upload.
           </p>
         </div>
 
