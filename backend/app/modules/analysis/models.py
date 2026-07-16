@@ -39,6 +39,7 @@ class TopicCluster(Base):
 
     # Relationships
     analysis: Mapped["Analysis"] = relationship("Analysis", back_populates="topic_clusters")
+    comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="topic_cluster")
 
 class Insight(Base):
     __tablename__ = "insights"
@@ -52,3 +53,26 @@ class Insight(Base):
 
     # Relationships
     analysis: Mapped["Analysis"] = relationship("Analysis", back_populates="insights")
+
+
+class AnalysisJob(Base):
+    __tablename__ = "analysis_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    video_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="queued", nullable=False)  # queued, running, completed, failed
+    priority: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    analysis_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("analyses.id", ondelete="SET NULL"), nullable=True)
+
+    # Relationships
+    user: Mapped["User"] = relationship("User")
+    video: Mapped["Video"] = relationship("Video")
+    analysis: Mapped["Analysis"] = relationship("Analysis")
+

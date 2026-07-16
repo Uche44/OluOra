@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import String, Integer, Text, Float, DateTime, ForeignKey
+from sqlalchemy import String, Integer, Text, Float, DateTime, ForeignKey, ARRAY
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db import Base
@@ -19,10 +19,13 @@ class Comment(Base):
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
     sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(ARRAY(Float), nullable=True)
+    topic_cluster_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("topic_clusters.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     video: Mapped["Video"] = relationship("Video", back_populates="comments")
+    topic_cluster: Mapped[Optional["TopicCluster"]] = relationship("TopicCluster", back_populates="comments")
     
     # Self-referencing relationships for threaded comment replies
     parent: Mapped[Optional["Comment"]] = relationship("Comment", remote_side=[id], back_populates="replies")

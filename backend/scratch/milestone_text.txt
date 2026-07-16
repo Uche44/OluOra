@@ -1,0 +1,22 @@
+Milestone 7: Text Preprocessing & Cleaning Pipeline**
+   
+<truncated 2328 bytes>
+ttings pages for user profiles, showing connected channels, token management, and account settings.
+
+#### **Phase D: Quota Management & Optimizations (Milestones 18–19)**
+*   **Milestone 18: Quota Budgeting & Queued Ingestion**
+    *   *Scope:* Implement backend daily limits tracking per user to prevent Google quota starvation and add a job execution queue.
+*   **Milestone 19: Cache Invalidation & ETag Optimization**
+    *   *Scope:* Add HTTP `If-None-Match` (ETags) support on YouTube requests to minimize quota usage by caching unmodified data.
+
+#### **Phase E: Multi-Platform (TikTok) Integration (Milestones 20–21)**
+*   **Milestone 20: TikTok Login Kit & Video List Display**
+    *   *Scope:* Add standard TikTok Display API authentication and video list metadata importing.
+*   **Milestone 21: TikTok Manual Comment Upload Flow (Option C)**
+    *   *Scope:* Since TikTok restricts comment APIs for commercial use, build a user-facing workflow to upload exported comment CSV/JSON data files for processing.
+
+#### **Phase F: Hardening, Testing & Deployment (Milestones 22–25)**
+*   **Milestone 22: Error Resilience & Graceful Fallbacks**
+    *   *Scope:* Add global exception handlers, custom error codes, offline banners, and LLM rate-limit retries.
+*   **Milestone 23: Complete End-to-End Testing**
+    *   *Scope:* Write comprehensive pytest tests for FastAPI services, mock API interactions, and verify fron

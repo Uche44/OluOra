@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, ConfigDict
 
 class ChannelBase(BaseModel):
     youtube_channel_id: str
@@ -19,8 +19,7 @@ class ChannelResponse(ChannelBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class VideoBase(BaseModel):
     youtube_video_id: str
@@ -40,5 +39,4 @@ class VideoResponse(VideoBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

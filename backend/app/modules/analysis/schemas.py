@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class AnalysisBase(BaseModel):
     status: str = "pending"
@@ -16,8 +16,7 @@ class AnalysisResponse(AnalysisBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TopicClusterBase(BaseModel):
     title: str
@@ -30,8 +29,7 @@ class TopicClusterResponse(TopicClusterBase):
     analysis_id: uuid.UUID
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class InsightBase(BaseModel):
     type: str
@@ -43,5 +41,11 @@ class InsightResponse(InsightBase):
     analysis_id: uuid.UUID
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InsightsListResponse(BaseModel):
+    questions: list[InsightResponse] = []
+    pain_points: list[InsightResponse] = []
+    positive_themes: list[InsightResponse] = []
+
