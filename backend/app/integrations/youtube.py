@@ -94,11 +94,13 @@ async def fetch_comment_threads(
     access_token: str,
     video_id: str,
     max_results: int = 100,
-    page_token: str | None = None
+    page_token: str | None = None,
+    etag: str | None = None
 ) -> dict:
     """
     Fetch a page of comment threads for a specific video from YouTube API.
     Uses part=snippet,replies to retrieve top-level comments and their inline replies.
+    Supports If-None-Match revalidation using the etag parameter.
     """
     url = "https://www.googleapis.com/youtube/v3/commentThreads"
     params = {
@@ -110,11 +112,21 @@ async def fetch_comment_threads(
     if page_token:
         params["pageToken"] = page_token
         
-    headers = {"Authorization": f"Bearer {access_token}"}
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+    if etag:
+        headers["If-None-Match"] = etag
     
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:
             response = await client.get(url, params=params, headers=headers)
+            
+            # Handle ETag match (304 Not Modified)
+            if response.status_code == 304:
+                logger.info(f"ETag matched for video {video_id} - HTTP 304 Not Modified")
+                return {"etag_matched": True}
+                
             if response.status_code != 200:
                 logger.error(f"Failed to fetch YouTube comment threads: {response.status_code} - {response.text}")
                 # Check for commentsDisabled reason
@@ -129,7 +141,12 @@ async def fetch_comment_threads(
                     pass
                 raise Exception("YouTube API request failed while fetching comment threads")
                 
-            return response.json()
+            data = response.json()
+            # Capture response etag and store it on a private key
+            resp_etag = response.headers.get("etag")
+            if resp_etag:
+                data["_etag"] = resp_etag
+            return data
         except Exception as e:
             if str(e) == "COMMENTS_DISABLED":
                 raise

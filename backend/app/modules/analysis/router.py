@@ -8,9 +8,10 @@ from app.dependencies.auth import get_current_user
 from app.modules.users.models import User, SocialAccount
 from app.modules.youtube.models import Video, Channel
 from app.modules.youtube.services import get_or_refresh_google_token
-from app.modules.analysis.models import Analysis, Insight, TopicCluster
-from app.modules.analysis.services import run_end_to_end_analysis
+from app.modules.analysis.models import Analysis, Insight, TopicCluster, AnalysisJob
+from app.modules.analysis.services import run_queued_analysis_job
 from app.modules.analysis.schemas import InsightsListResponse, InsightResponse, AnalysisResponse, TopicClusterResponse
+from app.modules.users.quota import verify_quota_limit
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
 
@@ -100,19 +101,37 @@ async def get_analysis_recommendations(
     return recommendations
 
 
-@router.post("/run/{video_id}", response_model=AnalysisResponse, status_code=status.HTTP_202_ACCEPTED)
-async def run_analysis(
+@router.post(
+    "/run/{video_id}",
+    response_model=AnalysisResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Trigger comments scraping, embedding, clustering and LLM insights generation"
+)
+async def trigger_analysis(
     video_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Triggers an asynchronous comment analysis run for the specified video.
-    This creates a new immutable Analysis record, pulls comments from YouTube,
-    generates embeddings, groups them via KMeans, and auto-labels them.
+    Validates daily YouTube quota, initializes a queued ingestion job, 
+    and schedules execution asynchronously.
     """
-    # 1. Verify video existence and ownership
+    # 1. Verify user's daily quota limit
+    try:
+        await verify_quota_limit(db, current_user.id, planned_cost=1)
+    except ValueError as q_err:
+        if str(q_err) == "QUOTA_EXCEEDED":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "QUOTA_EXCEEDED",
+                    "message": "Daily API quota limit exceeded. Please wait until tomorrow or upgrade your plan."
+                }
+            )
+        raise
+
+    # Fetch video details
     video_stmt = (
         select(Video)
         .join(Channel)
@@ -155,11 +174,23 @@ async def run_analysis(
     await db.commit()
     await db.refresh(analysis)
 
-    # 4. Schedule end-to-end processing pipeline in the background
-    background_tasks.add_task(
-        run_end_to_end_analysis,
-        analysis_id=analysis.id,
+    # 4. Create AnalysisJob queue record
+    job = AnalysisJob(
+        user_id=current_user.id,
         video_id=video_id,
+        status="queued",
+        priority=5,
+        attempts=0,
+        analysis_id=analysis.id
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+
+    # 5. Schedule end-to-end processing pipeline in the background
+    background_tasks.add_task(
+        run_queued_analysis_job,
+        job_id=job.id,
         google_token=google_token
     )
 

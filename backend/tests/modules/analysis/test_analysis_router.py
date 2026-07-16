@@ -223,12 +223,12 @@ async def test_run_analysis_success(client: AsyncClient, db: AsyncSession):
     await db.refresh(video)
 
     # Mock the background task execution
-    with patch("app.modules.analysis.router.run_end_to_end_analysis") as mock_background_task:
+    with patch("app.modules.analysis.router.run_queued_analysis_job") as mock_background_task:
         token = create_access_token({"sub": str(user.id)})
         headers = {"Authorization": f"Bearer {token}"}
 
         response = await client.post(f"/api/v1/analysis/run/{video.id}", headers=headers)
-        assert response.status_code == 202
+        assert response.status_code == 201
 
         data = response.json()
         assert data["video_id"] == str(video.id)

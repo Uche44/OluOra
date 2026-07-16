@@ -3,6 +3,7 @@ import os
 os.environ["LOKY_MAX_CPU_COUNT"] = "4"
 
 import uuid
+from datetime import datetime, timezone
 import logging
 import numpy as np
 from sqlalchemy import func, select, update
@@ -415,63 +416,87 @@ async def generate_insights_for_analysis(
         raise e
 
 
-async def run_end_to_end_analysis(
-    analysis_id: uuid.UUID,
-    video_id: uuid.UUID,
+async def run_queued_analysis_job(
+    job_id: uuid.UUID,
     google_token: str | None = None
 ) -> None:
     """
-    Background worker that executes the entire comments analysis pipeline:
-    1. Synchronizes YouTube comments for the video (if a token is provided).
+    Background worker that retrieves a queued analysis job and executes it:
+    1. Synchronizes YouTube comments for the video (if a token is provided), checking quota.
     2. Generates semantic embeddings for comments.
     3. Clusters comments using KMeans.
     4. Auto-titles clusters and generates structured insights via Groq.
+    Updates AnalysisJob and Analysis statuses dynamically.
     """
     from app.core.db import SessionLocal
     from app.modules.comments.services import sync_comments_for_video
     from app.modules.youtube.models import Video
-    from app.modules.analysis.models import Analysis
+    from app.modules.analysis.models import Analysis, AnalysisJob
 
     async with SessionLocal() as db:
+        # Fetch the job
+        job_stmt = select(AnalysisJob).where(AnalysisJob.id == job_id)
+        job_res = await db.execute(job_stmt)
+        job = job_res.scalars().first()
+        if not job:
+            logger.error(f"AnalysisJob {job_id} not found. Aborting queued task.")
+            return
+
+        # Update job status to running
+        job.status = "running"
+        job.started_at = datetime.now(timezone.utc)
+        job.attempts += 1
+        
+        # Update Analysis status to running
+        analysis_stmt = select(Analysis).where(Analysis.id == job.analysis_id)
+        analysis_res = await db.execute(analysis_stmt)
+        analysis = analysis_res.scalars().first()
+        if analysis:
+            analysis.status = "running"
+            
+        await db.commit()
+
+        video_id = job.video_id
+        analysis_id = job.analysis_id
+
         # 1. Fetch the video
-        video_result = await db.execute(
-            select(Video).where(Video.id == video_id)
-        )
-        video = video_result.scalars().first()
+        video_stmt = select(Video).where(Video.id == video_id)
+        video_res = await db.execute(video_stmt)
+        video = video_res.scalars().first()
+        
         if not video:
             logger.error(f"Video {video_id} not found. Aborting analysis background task.")
-            # Set status to failed
-            analysis_result = await db.execute(
-                select(Analysis).where(Analysis.id == analysis_id)
-            )
-            analysis = analysis_result.scalars().first()
+            error_msg = f"Video {video_id} not found."
+            
+            job.status = "failed"
+            job.completed_at = datetime.now(timezone.utc)
+            job.last_error = error_msg
+            
             if analysis:
                 analysis.status = "failed"
-                analysis.error_message = f"Video {video_id} not found."
-                await db.commit()
+                analysis.error_message = error_msg
+            await db.commit()
             return
 
         try:
             # Step A: Synchronize YouTube comments (if token provided)
             if google_token:
-                logger.info(f"Syncing comments for video {video_id} in background...")
+                logger.info(f"Syncing comments for video {video_id} in background queue...")
                 await sync_comments_for_video(db, video, google_token)
 
             # Step B: Generate embeddings
-            logger.info(f"Generating embeddings for video {video_id} in background...")
+            logger.info(f"Generating embeddings for video {video_id} in background queue...")
             await generate_embeddings_for_comments(db, video_id)
 
             # Step C: Group comments via KMeans clustering
-            logger.info(f"Clustering comments for video {video_id} in background...")
+            logger.info(f"Clustering comments for video {video_id} in background queue...")
             await cluster_comments_for_analysis(db, analysis_id, video_id)
 
             # Step D: Groq Insight Generation & Cluster Labeling
-            logger.info(f"Generating insights for analysis {analysis_id} in background...")
+            logger.info(f"Generating insights for analysis {analysis_id} in background queue...")
             await generate_insights_for_analysis(db, analysis_id, video_id)
 
-            # Update final comments analyzed count — query the TOTAL number of embedded
-            # comments for this video (not just those embedded this run, which would be
-            # 0 on any re-run since incremental embedding skips already-embedded ones).
+            # Update final comments analyzed count
             total_embedded_result = await db.execute(
                 select(func.count()).select_from(Comment).where(
                     Comment.video_id == video_id,
@@ -480,24 +505,50 @@ async def run_end_to_end_analysis(
             )
             total_analyzed = total_embedded_result.scalar() or 0
 
-            analysis_result = await db.execute(
-                select(Analysis).where(Analysis.id == analysis_id)
-            )
-            analysis_record = analysis_result.scalars().first()
+            # Re-fetch records inside session to update safely
+            job_stmt = select(AnalysisJob).where(AnalysisJob.id == job_id)
+            job = (await db.execute(job_stmt)).scalar_one()
+            analysis_stmt = select(Analysis).where(Analysis.id == analysis_id)
+            analysis_record = (await db.execute(analysis_stmt)).scalar_one_or_none()
+
+            job.status = "completed"
+            job.completed_at = datetime.now(timezone.utc)
+
             if analysis_record:
+                analysis_record.status = "completed"
                 analysis_record.comments_analyzed = total_analyzed
-                await db.commit()
+                
+            await db.commit()
+            logger.info(f"Successfully processed queued analysis job {job_id}")
 
         except Exception as e:
-            logger.exception(f"Background analysis task failed for analysis_id={analysis_id}: {e}")
-            analysis_result = await db.execute(
-                select(Analysis).where(Analysis.id == analysis_id)
-            )
-            analysis_record = analysis_result.scalars().first()
-            if analysis_record and (analysis_record.status != "failed" or not analysis_record.error_message):
-                analysis_record.status = "failed"
-                analysis_record.error_message = str(e)
-                await db.commit()
+            logger.exception(f"Background analysis task failed for job_id={job_id}: {e}")
+            await db.rollback()
+
+            # Create a clean session to record the failure
+            async with SessionLocal() as fail_db:
+                job_record = (await fail_db.execute(select(AnalysisJob).where(AnalysisJob.id == job_id))).scalar_one_or_none()
+                analysis_record = (await fail_db.execute(select(Analysis).where(Analysis.id == analysis_id))).scalar_one_or_none()
+                
+                error_str = str(e)
+                if "QUOTA_EXCEEDED" in error_str:
+                    error_msg = "Daily API quota limit exceeded. Sync aborted."
+                else:
+                    error_msg = error_str
+
+                if job_record:
+                    job_record.last_error = error_msg
+                    if job_record.attempts >= job_record.max_attempts or "QUOTA_EXCEEDED" in error_str:
+                        job_record.status = "failed"
+                        job_record.completed_at = datetime.now(timezone.utc)
+                    else:
+                        job_record.status = "queued"  # requeued for later retry
+
+                if analysis_record:
+                    analysis_record.status = "failed"
+                    analysis_record.error_message = error_msg
+
+                await fail_db.commit()
 
 
 def _generate_local_fallback_insights(clusters: list) -> dict:

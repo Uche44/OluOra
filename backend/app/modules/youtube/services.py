@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.users.models import User, SocialAccount
 from app.modules.youtube.models import Channel, Video
 from app.integrations import google, youtube
+from app.modules.users.quota import log_youtube_quota
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ async def sync_youtube_data(db: AsyncSession, user: User, max_results: int = 50)
     
     # 3. Fetch Channel Metadata from YouTube API
     channel_data = await youtube.fetch_channel_details(access_token)
+    await log_youtube_quota(db, user.id, "channels.list", 1)
     
     youtube_channel_id = channel_data["id"]
     snippet = channel_data.get("snippet", {})
@@ -101,11 +103,15 @@ async def sync_youtube_data(db: AsyncSession, user: User, max_results: int = 50)
     
     # 4. Fetch Latest Video IDs from Uploads Playlist
     video_ids = await youtube.fetch_latest_videos(access_token, uploads_playlist_id, max_results)
+    await log_youtube_quota(db, user.id, "playlistItems.list", 1)
     if not video_ids:
         return 0
         
     # 5. Fetch Full Video Metadata in Batches
     videos_data = await youtube.fetch_videos_metadata(access_token, video_ids)
+    num_chunks = (len(video_ids) + 49) // 50 if video_ids else 0
+    if num_chunks > 0:
+        await log_youtube_quota(db, user.id, "videos.list", num_chunks)
     
     videos_synced = 0
     for v_data in videos_data:

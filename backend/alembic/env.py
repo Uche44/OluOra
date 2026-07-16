@@ -16,10 +16,10 @@ from app.core.db import Base
 
 # Import all models to ensure they are registered on Base.metadata for autogenerate
 from app.modules.waitlist.models import WaitlistEntry
-from app.modules.users.models import User, SocialAccount
+from app.modules.users.models import User, SocialAccount, ApiQuotaUsage
 from app.modules.youtube.models import Channel, Video
 from app.modules.comments.models import Comment
-from app.modules.analysis.models import Analysis, TopicCluster, Insight
+from app.modules.analysis.models import Analysis, TopicCluster, Insight, AnalysisJob
 
 # this is the Alembic Config object
 config = context.config

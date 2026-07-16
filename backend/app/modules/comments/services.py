@@ -3,9 +3,10 @@ from datetime import datetime, timezone
 import uuid
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.modules.youtube.models import Video
+from app.modules.youtube.models import Video, Channel
 from app.modules.comments.models import Comment
 from app.integrations import youtube
+from app.modules.users.quota import verify_quota_limit, log_youtube_quota
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,11 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
     Sync comments for a given video from YouTube API.
     Implements incremental delta sync: stops when hitting a comment older than the newest stored comment.
     """
+    # Get creator user ID to check quota
+    creator_query = select(Channel.creator_id).where(Channel.id == video.channel_id)
+    creator_res = await db.execute(creator_query)
+    user_id = creator_res.scalar_one()
+
     # 1. Find the newest comment's published_at currently in the database
     latest_stmt = (
         select(Comment.published_at)
@@ -36,14 +42,37 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
     total_fetched = 0
     
     while not stop_sync and total_fetched < max_comments_limit:
+        # Check quota limit before making the request
+        await verify_quota_limit(db, user_id, planned_cost=1)
+
         # Fetch a page of comment threads
         try:
+            req_etag = video.etag if page_token is None else None
             response_data = await youtube.fetch_comment_threads(
                 access_token=access_token,
                 video_id=video.youtube_video_id,
                 max_results=100,
-                page_token=page_token
+                page_token=page_token,
+                etag=req_etag
             )
+            
+            # If ETag matched (HTTP 304)
+            if response_data.get("etag_matched"):
+                logger.info(f"ETag matched for video {video.youtube_video_id}. Comments unchanged.")
+                video.last_synced_at = datetime.now(timezone.utc)
+                video.sync_status = "completed"
+                db.add(video)
+                await db.commit()
+                return 0
+
+            # Store the new ETag on the first page load
+            if page_token is None:
+                new_etag = response_data.get("_etag")
+                if new_etag:
+                    video.etag = new_etag
+                    db.add(video)
+
+            await log_youtube_quota(db, user_id, "commentThreads.list", 1)
         except Exception as e:
             if str(e) == "COMMENTS_DISABLED":
                 video.sync_status = "disabled"

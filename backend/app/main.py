@@ -4,10 +4,10 @@ from app.core.config import settings
 from app.api.router import api_router
 
 # Import all models at startup to register them in SQLAlchemy's class registry
-from app.modules.users.models import User, SocialAccount
+from app.modules.users.models import User, SocialAccount, ApiQuotaUsage
 from app.modules.youtube.models import Channel, Video
 from app.modules.comments.models import Comment
-from app.modules.analysis.models import Analysis, TopicCluster, Insight
+from app.modules.analysis.models import Analysis, TopicCluster, Insight, AnalysisJob
 
 app = FastAPI(
     title="OluOra API",
