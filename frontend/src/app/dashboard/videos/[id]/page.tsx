@@ -82,8 +82,10 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
 
 
   // Fetch functions
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent: boolean = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -143,6 +145,19 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Set up background status polling when analysis is pending or running
+  useEffect(() => {
+    if (!analysis || (analysis.status !== "pending" && analysis.status !== "running")) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      loadData(true); // silent fetch in background
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [analysis, loadData]);
 
   // Trigger fresh analysis run
   const handleTriggerAnalysis = async () => {
@@ -228,7 +243,7 @@ export default function VideoInsightsPage({ params }: { params: Promise<{ id: st
         </div>
         <p className="leading-relaxed">{error}</p>
         <div className="flex gap-3 mt-2">
-          <button onClick={loadData} className="px-5 py-2 rounded-full bg-amber-700 text-white font-semibold hover:bg-amber-800 transition cursor-pointer">
+          <button onClick={() => loadData()} className="px-5 py-2 rounded-full bg-amber-700 text-white font-semibold hover:bg-amber-800 transition cursor-pointer">
             Retry Loading
           </button>
           <Link href="/dashboard/videos" className="px-5 py-2 rounded-full border border-amber-300 hover:bg-amber-100/50 transition text-center font-medium">
