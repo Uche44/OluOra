@@ -87,8 +87,36 @@ export default function PrivacyPolicyPage() {
           {/* Section 3 */}
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-emerald-400" />
+              3. Data Sharing, Transfer, and Disclosure
+            </h2>
+            <p className="text-zinc-400 text-sm">
+              We do not transfer or disclose your information to third parties for purposes other than the ones provided. We do not sell, rent, or trade your Google user data or YouTube channel information to any third-party advertising networks, data brokers, or commercial entities.
+            </p>
+            <p className="text-zinc-400 text-sm">
+              Google user data is only accessed and processed internally to provide the creator analytics and insight features explicitly requested by you.
+            </p>
+          </section>
+
+          {/* Section 4 */}
+          <section className="space-y-3">
+            <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
+              <Database className="w-5 h-5 text-teal-400" />
+              4. Data Protection and Security Safeguards
+            </h2>
+            <p className="text-zinc-400 text-sm">
+              Security procedures are in place to protect the confidentiality of your data. We use encryption to protect your information both in transit (via HTTPS and TLS 1.3 protocols) and at rest within our secure server infrastructure.
+            </p>
+            <p className="text-zinc-400 text-sm">
+              Access to system databases and OAuth tokens is strictly restricted to authorized system processes to prevent unauthorized access, alteration, or disclosure.
+            </p>
+          </section>
+
+          {/* Section 5 */}
+          <section className="space-y-3">
+            <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
               <Trash2 className="w-5 h-5 text-red-400" />
-              3. Data Retention and Deletion
+              5. Data Retention and Deletion
             </h2>
             <p>
               You maintain absolute control over your synced creator data:
@@ -98,10 +126,10 @@ export default function PrivacyPolicyPage() {
             </p>
           </section>
 
-          {/* Section 4 */}
+          {/* Section 6 */}
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-zinc-100">
-              4. Google API Services User Data Policy Compliance
+              6. Google API Services User Data Policy Compliance
             </h2>
             <p className="text-sm text-zinc-400">
               OluOra&apos;s use and transfer of information received from Google APIs will adhere to the{" "}
@@ -117,10 +145,10 @@ export default function PrivacyPolicyPage() {
             </p>
           </section>
 
-          {/* Section 5 */}
+          {/* Section 7 */}
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-zinc-100">
-              5. Third-Party Links
+              7. Third-Party Links
             </h2>
             <p className="text-sm text-zinc-400">
               Our site interacts with Google and YouTube services. By using OluOra, you agree to be bound by the{" "}
@@ -144,10 +172,10 @@ export default function PrivacyPolicyPage() {
             </p>
           </section>
 
-          {/* Section 6 */}
+          {/* Section 8 */}
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-zinc-100">
-              6. Contact Support
+              8. Contact Support
             </h2>
             <p className="text-sm text-zinc-400">
               If you have any questions about this Privacy Policy or wish to request data purging, please reach out to us at <a href="mailto:perp@ijuaalkiez.resend.app" className="text-teal-400 hover:underline">contact email</a>.
