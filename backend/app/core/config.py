@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # AI Integrations
     GROQ_API_KEY: str = ""
-    GROQ_LLM_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_LLM_MODEL: str = "openai/gpt-oss-120b"
     HF_API_KEY: str = ""
     HF_EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
 

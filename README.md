@@ -86,7 +86,7 @@ All architecture, API design, and design system documentation lives in the [`doc
 | Frontend | Next.js 16, TypeScript, Tailwind CSS v4, Framer Motion |
 | Backend | FastAPI, SQLAlchemy 2, Alembic, Pydantic v2 |
 | Database | PostgreSQL + pgvector |
-| AI | Groq API (LLaMA / Mixtral) · OpenAI-compatible |
+| AI | Groq API (open-weight GPT-OSS models) · OpenAI-compatible |
 | Email | Sendbyte Africa |
 | Deployment | Vercel (frontend) · Railway (backend) · Neon (database) |
 

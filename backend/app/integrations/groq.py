@@ -20,7 +20,7 @@ async def generate_chat_completion(
                    to response_format.
 
     Returns:
-        The text response content from Llama 3 / Groq.
+        The text response content from the configured Groq LLM (e.g. GPT-OSS).
     """
     if not settings.GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY is not set in configurations.")
