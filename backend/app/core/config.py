@@ -1,6 +1,19 @@
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Sentinel used only as a code-level default. Never acceptable as a real signing key.
+_INSECURE_JWT_SECRET_DEFAULT = "secret-key-change-in-production-32chars"
+
+# Public example value shipped in .env.example; also treated as insecure.
+_INSECURE_JWT_SECRETS = {
+    _INSECURE_JWT_SECRET_DEFAULT,
+    "super_secret_cryptographically_secure_random_string_here",
+    "",
+}
+
+# Require at least this many characters for a signing key.
+_MIN_JWT_SECRET_LENGTH = 32
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -9,7 +22,8 @@ class Settings(BaseSettings):
     )
 
     ENVIRONMENT: str = "dev"
-    DEBUG: bool = True
+    # Fail toward safety: default to False unless explicitly enabled in dev.
+    DEBUG: bool = False
 
     # Database
     DATABASE_URL: str
@@ -24,7 +38,7 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str
 
     # JWT Authentication
-    JWT_SECRET: str = "secret-key-change-in-production-32chars"
+    JWT_SECRET: str = _INSECURE_JWT_SECRET_DEFAULT
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -39,8 +53,30 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
 
     @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
+
+    @property
     def cors_origins_list(self) -> List[str]:
         # Strip trailing slashes and whitespace to avoid strict origin mismatch errors
         return [i.strip().rstrip("/") for i in self.CORS_ORIGINS.split(",") if i.strip()]
 
 settings = Settings()
+
+# ---------------------------------------------------------------------------
+# Boot-time security guard: refuse to start with an unsafe JWT signing secret.
+# A leaked/weak JWT_SECRET lets anyone forge access and refresh tokens, which
+# would be a full account-takeover vector in production.
+# ---------------------------------------------------------------------------
+if (
+    settings.ENVIRONMENT.lower() == "production"
+    and (
+        len(settings.JWT_SECRET) < _MIN_JWT_SECRET_LENGTH
+        or settings.JWT_SECRET in _INSECURE_JWT_SECRETS
+    )
+):
+    raise RuntimeError(
+        "Refusing to start in production: JWT_SECRET is missing or too weak. "
+        f"Set a unique, random JWT_SECRET of at least {_MIN_JWT_SECRET_LENGTH} "
+        "characters (e.g. `python -c \"import secrets; print(secrets.token_urlsafe(64))\"`)."
+    )

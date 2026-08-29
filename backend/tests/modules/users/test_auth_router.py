@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.users.models import User, SocialAccount
 from app.core.security import create_refresh_token, decode_token
+from app.integrations import google as google_integration
 
 pytestmark = pytest.mark.asyncio
 
@@ -16,6 +17,20 @@ async def test_get_google_url(client: AsyncClient):
     assert "accounts.google.com" in data["url"]
     assert "scope=" in data["url"]
     assert "youtube.readonly" in data["url"]
+    assert "state=" in data["url"]
+    assert data["state"]
+
+async def test_google_callback_rejects_missing_state(client: AsyncClient):
+    # A callback with no/invalid OAuth state must be rejected (login CSRF guard).
+    payload = {"code": "google-auth-code-xyz"}
+    response = await client.post("/api/v1/auth/google/callback", json=payload)
+    assert response.status_code == 400
+
+async def test_google_callback_rejects_forged_state(client: AsyncClient):
+    # A tampered/forged state token must be rejected.
+    payload = {"code": "google-auth-code-xyz", "state": "forged-state-token"}
+    response = await client.post("/api/v1/auth/google/callback", json=payload)
+    assert response.status_code == 400
 
 @patch("app.integrations.google.exchange_code_for_tokens", new_callable=AsyncMock)
 @patch("app.integrations.google.get_google_user_profile", new_callable=AsyncMock)
@@ -39,7 +54,8 @@ async def test_google_callback_new_user(
     }
 
     # Execute request
-    payload = {"code": "google-auth-code-xyz"}
+    state = google_integration.create_oauth_state()
+    payload = {"code": "google-auth-code-xyz", "state": state}
     response = await client.post("/api/v1/auth/google/callback", json=payload)
     
     assert response.status_code == 200
@@ -111,7 +127,8 @@ async def test_google_callback_existing_user(
     }
 
     # Execute callback request
-    payload = {"code": "existing-auth-code"}
+    state = google_integration.create_oauth_state()
+    payload = {"code": "existing-auth-code", "state": state}
     response = await client.post("/api/v1/auth/google/callback", json=payload)
     
     assert response.status_code == 200
