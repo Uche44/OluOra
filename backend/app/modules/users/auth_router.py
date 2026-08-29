@@ -18,6 +18,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 class GoogleLoginRequest(BaseModel):
     code: str
+    state: str
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -34,20 +35,33 @@ class RefreshTokenResponse(BaseModel):
 
 @router.get("/google/url", summary="Get Google OAuth authorization URL")
 async def get_google_url():
-    """Returns the authorization redirect URI for initiating YouTube Sign-In."""
-    url = google.get_google_auth_url()
-    return {"url": url}
+    """Returns the authorization redirect URI for initiating YouTube Sign-In.
+
+    Also returns a signed, expiring `state` token that the client must store and
+    echo back to the callback endpoint to guard against login CSRF.
+    """
+    state = google.create_oauth_state()
+    url = google.get_google_auth_url(state=state)
+    return {"url": url, "state": state}
 
 @router.post("/google/callback", response_model=TokenResponse, summary="Process Google OAuth callback code")
 async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depends(get_db)):
     """Processes the callback code, exchanges it for tokens, syncs user records, and issues JWTs."""
+    # 0. Verify the OAuth state token to prevent login CSRF (forged/reused flows).
+    if not google.verify_oauth_state(payload.state):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OAuth state. Please start the sign-in flow again.",
+        )
+
     # 1. Exchange OAuth code for Google credentials
     try:
         tokens = await google.exchange_code_for_tokens(payload.code)
-    except Exception as e:
+    except Exception:
+        logger.exception("Google token exchange failed")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Google token exchange failed: {str(e)}"
+            detail="Google token exchange failed. Please try again.",
         )
     
     access_token = tokens.get("access_token")
@@ -63,10 +77,11 @@ async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depend
     # 2. Retrieve user profile info from Google
     try:
         profile = await google.get_google_user_profile(access_token)
-    except Exception as e:
+    except Exception:
+        logger.exception("Failed to fetch Google profile")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to fetch Google profile: {str(e)}"
+            detail="Failed to retrieve your Google profile. Please try again.",
         )
         
     email = profile.get("email")

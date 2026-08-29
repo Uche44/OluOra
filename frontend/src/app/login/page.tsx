@@ -74,6 +74,11 @@ export default function LoginPage() {
 
       const data = await res.json();
       if (data.url) {
+        // Persist the signed OAuth state token so the callback page can echo it
+        // back and prove this login flow was initiated from this browser (CSRF guard).
+        if (data.state) {
+          sessionStorage.setItem("google_oauth_state", data.state);
+        }
         window.location.href = data.url;
       } else {
         throw new Error("No URL returned from backend auth service");
