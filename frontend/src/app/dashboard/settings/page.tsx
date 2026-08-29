@@ -8,14 +8,10 @@ import {
   User, 
   Globe, 
   ShieldAlert, 
-  Key, 
   RefreshCw, 
   AlertTriangle, 
   CheckCircle,
-  Eye,
-  EyeOff,
-  Video,
-  UserCheck
+  Video
 } from "lucide-react";
 
 interface ConnectedChannel {
@@ -59,10 +55,6 @@ export default function SettingsPage() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [showConfirmDisconnect, setShowConfirmDisconnect] = useState(false);
 
-  // Debug session state
-  const [showToken, setShowToken] = useState(false);
-  const [sessionToken, setSessionToken] = useState("");
-
   const fetchProfile = async () => {
     setLoading(true);
     setError(null);
@@ -75,10 +67,6 @@ export default function SettingsPage() {
       const data = await res.json();
       setProfile(data);
       setFullName(data.full_name || "");
-      
-      // Load current session token for debug
-      const token = localStorage.getItem("access_token") || "";
-      setSessionToken(token);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "An unexpected error occurred loading your settings.");
@@ -369,55 +357,6 @@ export default function SettingsPage() {
               </Link>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Session Security Details */}
-      <div className="bg-white/70 backdrop-blur-md border border-outline-variant/10 rounded-3xl p-8 shadow-sm flex flex-col gap-4">
-        <div className="flex items-center gap-3 border-b border-outline-variant/10 pb-4">
-          <Key className="w-5 h-5 text-primary" />
-          <h2 className="font-playfair text-lg font-bold text-primary">Session Token &amp; Credentials</h2>
-        </div>
-
-        <div className="flex flex-col gap-3 font-literata text-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-on-surface-variant font-medium">Internal Session Type:</span>
-            <span className="font-semibold text-primary inline-flex items-center gap-1">
-              <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
-              OluOra JWT (Bearer)
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-on-surface-variant font-medium">Session Status:</span>
-            <span className="font-semibold text-emerald-700">Authenticated &amp; Active</span>
-          </div>
-
-          <div className="flex flex-col gap-1.5 mt-2 border-t border-outline-variant/10 pt-4">
-            <div className="flex items-center justify-between">
-              <span className="text-on-surface-variant font-semibold">Active Access Token (Decrypted Bearer):</span>
-              <button
-                onClick={() => setShowToken(!showToken)}
-                className="flex items-center gap-1.5 text-[11px] font-semibold text-primary hover:underline cursor-pointer"
-              >
-                {showToken ? (
-                  <>
-                    <EyeOff className="w-3 h-3" /> Hide Token
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-3 h-3" /> Reveal Token
-                  </>
-                )}
-              </button>
-            </div>
-
-            {showToken && (
-              <div className="bg-surface-container p-4 rounded-xl border border-outline-variant/20 font-mono text-[10px] break-all select-all leading-normal text-on-surface-variant">
-                {sessionToken}
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </motion.div>
