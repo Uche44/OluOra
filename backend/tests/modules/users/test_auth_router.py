@@ -1,11 +1,13 @@
+import uuid
 import pytest
 from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.modules.users.models import User, SocialAccount
+from app.modules.users.models import User, SocialAccount, RefreshToken
 from app.core.security import create_refresh_token, decode_token
 from app.integrations import google as google_integration
+from app.modules.users import token_service
 
 pytestmark = pytest.mark.asyncio
 
@@ -156,8 +158,10 @@ async def test_refresh_token_success(client: AsyncClient, db: AsyncSession):
     await db.commit()
     await db.refresh(user)
 
-    # 2. Sign a valid refresh token
-    refresh_token = create_refresh_token({"sub": str(user.id)})
+    # 2. Sign and persist a valid refresh token (server-side registry tracks it)
+    refresh_jti = str(uuid.uuid4())
+    refresh_token = create_refresh_token({"sub": str(user.id)}, jti=refresh_jti)
+    await token_service.issue_refresh_token(db, user.id, refresh_token, refresh_jti)
 
     # 3. Call refresh endpoint
     payload = {"refresh_token": refresh_token}
@@ -166,6 +170,7 @@ async def test_refresh_token_success(client: AsyncClient, db: AsyncSession):
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
+    assert "refresh_token" in data
     assert data["token_type"] == "bearer"
 
     # Decode and check that new access token belongs to user
@@ -173,6 +178,52 @@ async def test_refresh_token_success(client: AsyncClient, db: AsyncSession):
     assert decoded is not None
     assert decoded["sub"] == str(user.id)
     assert decoded["type"] == "access"
+
+    # Old token must now be revoked (rotated) server-side
+    old_result = await db.execute(select(RefreshToken).where(RefreshToken.jti == refresh_jti))
+    old_row = old_result.scalar_one_or_none()
+    assert old_row is not None
+    assert old_row.revoked is True
+
+    # The new refresh token must also be valid for a follow-up refresh (rotation chain)
+    repeated = await client.post("/api/v1/auth/refresh", json={"refresh_token": data["refresh_token"]})
+    assert repeated.status_code == 200
+
+async def test_refresh_token_reuse_rejected(client: AsyncClient, db: AsyncSession):
+    # Rotating a refresh token must make the ORIGINAL unusable (reuse detection).
+    user = User(email="token_reuse@gmail.com", full_name="Reuse Tester", is_active=True)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    refresh_jti = str(uuid.uuid4())
+    refresh_token = create_refresh_token({"sub": str(user.id)}, jti=refresh_jti)
+    await token_service.issue_refresh_token(db, user.id, refresh_token, refresh_jti)
+
+    # First use rotates + invalidates the token
+    first = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert first.status_code == 200
+
+    # Replaying the SAME token must now fail
+    replay = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert replay.status_code == 401
+
+async def test_logout_revokes_tokens(client: AsyncClient, db: AsyncSession):
+    user = User(email="logout_tester@gmail.com", full_name="Logout Tester", is_active=True)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    refresh_jti = str(uuid.uuid4())
+    refresh_token = create_refresh_token({"sub": str(user.id)}, jti=refresh_jti)
+    await token_service.issue_refresh_token(db, user.id, refresh_token, refresh_jti)
+
+    resp = await client.post("/api/v1/auth/logout", json={"refresh_token": refresh_token})
+    assert resp.status_code == 200
+
+    # Logged-out token can no longer refresh
+    r2 = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert r2.status_code == 401
 
 async def test_refresh_token_invalid(client: AsyncClient):
     payload = {"refresh_token": "invalid.signature.payload"}

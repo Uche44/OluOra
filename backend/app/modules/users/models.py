@@ -68,3 +68,28 @@ class ApiQuotaUsage(Base):
 
     user: Mapped["User"] = relationship("User")
 
+
+class RefreshToken(Base):
+    """Server-side registry of issued (OluOra) refresh tokens.
+
+    Enables refresh-token rotation and revocation:
+      * Each issued token is stored here keyed by its unique ``jti`` claim.
+      * Only a SHA-256 hash of the token is persisted so a DB leak does not
+        expose usable refresh tokens.
+      * Rotation revokes the old token and issues a new one, so a stolen token
+        cannot be reused once refreshed.
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    jti: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user: Mapped["User"] = relationship("User")
+

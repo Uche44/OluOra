@@ -18,6 +18,10 @@ export async function refreshAccessToken(): Promise<string | null> {
       const newAccessToken = data.access_token;
       if (newAccessToken) {
         localStorage.setItem("access_token", newAccessToken);
+        // Refresh tokens are rotated: persist the new one so future refreshes work.
+        if (data.refresh_token) {
+          localStorage.setItem("refresh_token", data.refresh_token);
+        }
         return newAccessToken;
       }
     }
@@ -30,6 +34,29 @@ export async function refreshAccessToken(): Promise<string | null> {
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("user");
   return null;
+}
+
+export function clearAuthStorage(): void {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("user");
+}
+
+export async function logout(): Promise<void> {
+  const refreshToken = localStorage.getItem("refresh_token");
+  // Best-effort server-side revocation of the refresh token.
+  if (refreshToken) {
+    try {
+      await fetch(`${apiUrl}/api/v1/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken })
+      });
+    } catch (e) {
+      console.error("Error during logout:", e);
+    }
+  }
+  clearAuthStorage();
 }
 
 export async function authedFetch(url: string, options: RequestInit = {}): Promise<Response> {
