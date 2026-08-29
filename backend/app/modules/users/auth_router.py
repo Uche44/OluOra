@@ -2,14 +2,15 @@ import uuid
 import logging
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.security import create_access_token, create_refresh_token, decode_token
+from app.core.security import create_access_token, create_refresh_token
 from app.modules.users.models import User, SocialAccount
 from app.modules.users.schemas import UserResponse
+from app.modules.users import token_service
 from app.integrations import google
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,11 @@ class RefreshTokenRequest(BaseModel):
 
 class RefreshTokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
 
 @router.get("/google/url", summary="Get Google OAuth authorization URL")
 async def get_google_url():
@@ -147,10 +152,13 @@ async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depend
         
     await db.commit()
 
-    # 5. Generate OluOra JWT session tokens
+    # 5. Generate OluOra JWT session tokens and persist the refresh token
+    #    server-side so it can be rotated and revoked.
     jwt_access = create_access_token({"sub": str(user.id)})
-    jwt_refresh = create_refresh_token({"sub": str(user.id)})
-    
+    refresh_jti = str(uuid.uuid4())
+    jwt_refresh = create_refresh_token({"sub": str(user.id)}, jti=refresh_jti)
+    await token_service.issue_refresh_token(db, user.id, jwt_refresh, refresh_jti)
+
     return {
         "access_token": jwt_access,
         "refresh_token": jwt_refresh,
@@ -159,51 +167,37 @@ async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depend
 
 @router.post("/refresh", response_model=RefreshTokenResponse, summary="Refresh OluOra JWT access token")
 async def refresh_access_token(payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
-    """Generates a new access token using a valid OluOra JWT refresh token."""
-    decoded = decode_token(payload.refresh_token)
-    
-    if not decoded or decoded.get("type") != "refresh":
+    """Rotates a refresh token: validates the existing one, revokes it server-side,
+    and issues a fresh access + refresh token pair. A stolen/used token cannot be reused."""
+    # 1. Validate the presented token against the server-side registry.
+    validated = await token_service.validate_refresh_token(db, payload.refresh_token)
+    if not validated:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
-    user_id_str = decoded.get("sub")
-    if not user_id_str:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token payload",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
-    try:
-        user_id = uuid.UUID(user_id_str)
-    except (ValueError, TypeError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid user ID format in token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user account"
-        )
-        
+
+    row, user = validated
+
+    # 2. Revoke the old token (rotation), so it can never be used again.
+    await token_service.revoke_refresh_token(db, row)
+
+    # 3. Issue a fresh access token + a new refresh token, and persist the new one.
     new_access = create_access_token({"sub": str(user.id)})
-    
+    new_refresh_jti = str(uuid.uuid4())
+    new_refresh = create_refresh_token({"sub": str(user.id)}, jti=new_refresh_jti)
+    await token_service.issue_refresh_token(db, user.id, new_refresh, new_refresh_jti)
+
     return {
-        "access_token": new_access
+        "access_token": new_access,
+        "refresh_token": new_refresh,
+        "token_type": "bearer",
     }
+
+@router.post("/logout", summary="Log out and revoke refresh tokens")
+async def logout(payload: LogoutRequest, db: AsyncSession = Depends(get_db)):
+    """Revokes the presented refresh token (and all others for that user)."""
+    await token_service.revoke_by_token(db, payload.refresh_token)
+    # Always succeed from the client's perspective; over-revoking is safe.
+    return {"success": True}

@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logout } from "@/lib/api";
 
 interface UserSession {
   email: string;
@@ -55,10 +56,9 @@ export default function DashboardLayout({
     }
   }, [router]);
 
-  const handleSignOut = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
+  const handleSignOut = async () => {
+    // Revoke the refresh token server-side, then clear local auth state.
+    await logout();
     router.push("/login");
   };
 

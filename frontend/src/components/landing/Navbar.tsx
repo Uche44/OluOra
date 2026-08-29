@@ -6,6 +6,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, User, LogOut, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logout } from "@/lib/api";
 
 // Map each nav link to the section ID it corresponds to.
 // "Home" has no hash — it's active when no other section is intersecting.
@@ -53,10 +54,9 @@ export default function Navbar() {
   }, []);
 
   // Sign out helper
-  const handleSignOut = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
+  const handleSignOut = async () => {
+    // Revoke the refresh token server-side, then clear local auth state.
+    await logout();
     setUser(null);
     window.location.reload();
   };

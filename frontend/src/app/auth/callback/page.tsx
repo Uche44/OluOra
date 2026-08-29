@@ -54,7 +54,7 @@ function CallbackHandler() {
 
     const exchangeCode = async () => {
       try {
-        setStatus("Verifying Google credentials...");
+        setStatus("Gimme a sec...");
         const apiUrl =
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         const res = await fetch(`${apiUrl}/api/v1/auth/google/callback`, {
@@ -158,7 +158,7 @@ function LoadingFallback() {
         <YoutubeLogo className="w-6 h-6" />
       </div>
       <h3 className="font-playfair text-xl font-bold text-primary">
-        Loading Auth Handler...
+        Signing you in...
       </h3>
     </div>
   );
