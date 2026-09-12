@@ -2,14 +2,15 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from app.core import providers
 from app.core.db import get_db
 from app.dependencies.auth import get_current_user
-from app.modules.users.models import User, SocialAccount
+from app.modules.users.models import User
 from app.modules.youtube.models import Channel, Video
 from app.modules.comments.models import Comment
 from app.modules.comments.schemas import CommentPaginationResponse
 from app.modules.comments.services import sync_comments_for_video
-from app.modules.youtube.services import get_or_refresh_google_token
+from app.modules.users.social_tokens import get_social_account, get_or_refresh_social_token
 
 router = APIRouter(prefix="/videos", tags=["Comments"])
 
@@ -104,11 +105,19 @@ async def sync_comments(
             }
         )
         
-    # 2. Fetch connected Google SocialAccount details
-    social_stmt = select(SocialAccount).where(SocialAccount.user_id == current_user.id)
-    social_result = await db.execute(social_stmt)
-    social = social_result.scalar_one_or_none()
-    
+    # 2. Comment ingestion is YouTube-only — TikTok exposes no comment-read API.
+    if video.platform != providers.YOUTUBE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "COMMENTS_NOT_SUPPORTED",
+                "message": "TikTok comment analysis is coming soon."
+            }
+        )
+
+    # 3. Fetch the connected YouTube account
+    social = await get_social_account(db, current_user.id, providers.YOUTUBE)
+
     if not social:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -118,9 +127,9 @@ async def sync_comments(
             }
         )
         
-    # 3. Synchronize comments
+    # 4. Synchronize comments
     try:
-        access_token = await get_or_refresh_google_token(db, social)
+        access_token = await get_or_refresh_social_token(db, social)
         new_comments_count = await sync_comments_for_video(db, video, access_token)
         return {
             "success": True,

@@ -1,6 +1,7 @@
 interface VideoDetails {
   id: string;
-  youtube_video_id: string;
+  platform: string;
+  external_id: string;
   title: string;
   description: string;
   thumbnail_url: string;

@@ -52,13 +52,13 @@ async def test_sync_comments_etag_match_returns_zero(db: AsyncSession):
     db.add(user)
     await db.commit()
 
-    channel = Channel(creator_id=user.id, youtube_channel_id="UC_etag", title="Chan")
+    channel = Channel(creator_id=user.id, external_id="UC_etag", title="Chan")
     db.add(channel)
     await db.commit()
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-etag-304",
+        external_id="video-etag-304",
         title="ETag Video",
         published_at=datetime.now(timezone.utc),
         etag="cached-etag-456"
@@ -68,7 +68,7 @@ async def test_sync_comments_etag_match_returns_zero(db: AsyncSession):
 
     # Mock fetch_comment_threads to return etag_matched=True
     with patch("app.integrations.youtube.fetch_comment_threads", new_callable=AsyncMock) as mock_fetch, \
-         patch("app.modules.comments.services.log_youtube_quota", new_callable=AsyncMock) as mock_log_quota:
+         patch("app.modules.comments.services.log_api_quota", new_callable=AsyncMock) as mock_log_quota:
         
         mock_fetch.return_value = {"etag_matched": True}
 
@@ -95,13 +95,13 @@ async def test_sync_comments_new_etag_updates_video(db: AsyncSession):
     db.add(user)
     await db.commit()
 
-    channel = Channel(creator_id=user.id, youtube_channel_id="UC_etag_new", title="Chan")
+    channel = Channel(creator_id=user.id, external_id="UC_etag_new", title="Chan")
     db.add(channel)
     await db.commit()
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-etag-new",
+        external_id="video-etag-new",
         title="ETag Video New",
         published_at=datetime.now(timezone.utc),
         etag="old-etag"
@@ -111,7 +111,7 @@ async def test_sync_comments_new_etag_updates_video(db: AsyncSession):
 
     # Mock fetch_comment_threads to return a successful page list with a new ETag
     with patch("app.integrations.youtube.fetch_comment_threads", new_callable=AsyncMock) as mock_fetch, \
-         patch("app.modules.comments.services.log_youtube_quota", new_callable=AsyncMock):
+         patch("app.modules.comments.services.log_api_quota", new_callable=AsyncMock):
         
         mock_fetch.return_value = {
             "items": [],

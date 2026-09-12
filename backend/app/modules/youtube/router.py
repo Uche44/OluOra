@@ -55,6 +55,7 @@ async def get_videos_list(
     search: str | None = None,
     sort: str = "published_at",
     status_filter: str | None = Query(None, alias="status"),
+    platform: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -62,6 +63,10 @@ async def get_videos_list(
     try:
         # Base query to retrieve videos owned by current creator
         base_query = select(Video).join(Channel).where(Channel.creator_id == current_user.id)
+
+        # Apply platform filter
+        if platform:
+            base_query = base_query.where(Video.platform == platform)
 
         # Apply case-insensitive substring search filter
         if search:
@@ -108,7 +113,8 @@ async def get_videos_list(
         for v in videos:
             video_list.append({
                 "id": str(v.id),
-                "youtube_video_id": v.youtube_video_id,
+                "platform": v.platform,
+                "external_id": v.external_id,
                 "title": v.title,
                 "description": v.description,
                 "thumbnail_url": v.thumbnail_url,
@@ -162,7 +168,8 @@ async def get_video_details(
         )
     return {
         "id": str(video.id),
-        "youtube_video_id": video.youtube_video_id,
+        "platform": video.platform,
+        "external_id": video.external_id,
         "title": video.title,
         "description": video.description,
         "thumbnail_url": video.thumbnail_url,

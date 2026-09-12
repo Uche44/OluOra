@@ -1,0 +1,7 @@
+# Taste
+- Backend local dev setup: PostgreSQL runs locally via `backend/docker-compose.yml` (container `oluora`); Alembic migrations are run from the backend venv (Python 3.14, `source venv/bin/activate && alembic upgrade head` in `backend/`); docker commands on this machine require sudo. Confidence: 0.7
+- Keeps task specs and platform/API reference material as markdown files inside the repo (e.g. a per-task spec file plus `docs/references.md`) and expects the agent to read and rely on those files for links and API knowledge. Confidence: 0.6
+- Explicitly invites the agent to ask clarifying questions before/while working rather than guessing. Confidence: 0.5
+- Reports bugs by pasting raw browser console/stack dumps rather than describing the visible error or asking a question — expect noise (ad-blocker blocks, telemetry 4xx) to be filtered out and the real cause verified server-side before answering. Confidence: 0.6
+- Expects the agent to not make unsolicited "improvements" that alter existing behavior; reverts changes that break functionality (e.g., asked to restore the `youtube.force-ssl` scope the agent had removed). Do not strip features/scopes based on assumptions — verify against real behavior first. Confidence: 0.4
+- For dev-environment resets, prefers wiping data only (`TRUNCATE ... RESTART IDENTITY CASCADE` on all tables) while preserving schema and Alembic migration state, rather than dropping/recreating the DB or debugging around stale rows. Confidence: 0.55

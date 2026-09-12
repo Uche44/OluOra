@@ -4,26 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ShieldAlert, Sparkles, CheckCircle2 } from "lucide-react";
-
-// Red YouTube brand logo SVG to replace missing lucide-react exports
-const YoutubeLogo = ({ className = "w-6 h-6" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.107C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.388.511a3.002 3.002 0 0 0-2.11 2.107C0 8.053 0 12 0 12s0 3.947.502 5.837a3.003 3.003 0 0 0 2.11 2.107c1.883.511 9.388.511 9.388.511s7.505 0 9.388-.511a3.002 3.002 0 0 0 2.11-2.107C24 15.947 24 12 24 12s0-3.947-.502-5.837z"
-      fill="#FF0000"
-    />
-    <path
-      d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z"
-      fill="#FFFFFF"
-    />
-  </svg>
-);
+import { ShieldAlert, Sparkles } from "lucide-react";
 
 const LS_STATE_KEY = "google_oauth_state";
 
@@ -134,7 +115,6 @@ function CallbackHandler() {
       {/* Premium loader spinner */}
       <div className="relative w-16 h-16 flex items-center justify-center">
         <div className="absolute inset-0 rounded-full border-4 border-primary-container/10 border-t-primary animate-spin" />
-        <YoutubeLogo className="w-6 h-6" />
       </div>
 
       <div className="flex flex-col gap-2">
@@ -155,7 +135,6 @@ function LoadingFallback() {
     <div className="w-full max-w-md bg-white border border-outline-variant/20 rounded-3xl p-8 shadow-xl text-center flex flex-col items-center gap-6">
       <div className="relative w-16 h-16 flex items-center justify-center">
         <div className="absolute inset-0 rounded-full border-4 border-primary-container/10 border-t-primary animate-spin" />
-        <YoutubeLogo className="w-6 h-6" />
       </div>
       <h3 className="font-playfair text-xl font-bold text-primary">
         Signing you in...

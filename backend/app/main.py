@@ -11,7 +11,7 @@ from app.modules.analysis.models import Analysis, TopicCluster, Insight, Analysi
 
 app = FastAPI(
     title="OluOra API",
-    description="Audience Intelligence API for YouTube Creators",
+    description="Audience Intelligence API for video creators",
     version="1.0.0",
     debug=settings.DEBUG
 )

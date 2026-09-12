@@ -3,11 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import providers
 from app.core.db import get_db
 from app.dependencies.auth import get_current_user
-from app.modules.users.models import User, SocialAccount
+from app.modules.users.models import User
 from app.modules.youtube.models import Video, Channel
-from app.modules.youtube.services import get_or_refresh_google_token
+from app.modules.users.social_tokens import get_social_account, get_or_refresh_social_token
 from app.modules.analysis.models import Analysis, Insight, TopicCluster, AnalysisJob
 from app.modules.analysis.services import run_queued_analysis_job
 from app.modules.analysis.schemas import InsightsListResponse, InsightResponse, AnalysisResponse, TopicClusterResponse
@@ -148,19 +149,24 @@ async def trigger_analysis(
             }
         )
 
-    # 2. Retrieve active social connection & refresh google token
-    social_stmt = select(SocialAccount).where(
-        SocialAccount.user_id == current_user.id,
-        SocialAccount.provider == "google"
-    )
-    social_result = await db.execute(social_stmt)
-    social = social_result.scalars().first()
+    # Analysis depends on comment ingestion, which is YouTube-only.
+    if video.platform != providers.YOUTUBE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "COMMENTS_NOT_SUPPORTED",
+                "message": "TikTok comment analysis is coming soon."
+            }
+        )
+
+    # 2. Retrieve the connected YouTube account & refresh its token
+    social = await get_social_account(db, current_user.id, providers.YOUTUBE)
 
     google_token = None
     if social:
         try:
-            google_token = await get_or_refresh_google_token(db, social)
-        except Exception as e:
+            google_token = await get_or_refresh_social_token(db, social)
+        except Exception:
             # Continue analysis even if OAuth refresh fails (will use local comments cache)
             pass
 

@@ -38,7 +38,8 @@ class SocialAccountResponse(SocialAccountBase):
 
 class ConnectedChannelSchema(BaseModel):
     id: uuid.UUID
-    youtube_channel_id: str
+    platform: str
+    external_id: str
     title: str
     description: str | None = None
     thumbnail_url: str | None = None
@@ -62,6 +63,7 @@ class UserProfileResponse(BaseModel):
     full_name: str | None = None
     profile_picture: str | None = None
     is_active: bool
+    auth_provider: str = "google"
     created_at: datetime
     connections: list[ConnectedAccountSchema] = []
     channels: list[ConnectedChannelSchema] = []

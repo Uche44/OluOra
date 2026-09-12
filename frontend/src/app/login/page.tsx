@@ -39,24 +39,6 @@ const GoogleLogo = () => (
   </svg>
 );
 
-const YoutubeLogo = ({ className = "w-8 h-8" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.107C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.388.511a3.002 3.002 0 0 0-2.11 2.107C0 8.053 0 12 0 12s0 3.947.502 5.837a3.003 3.003 0 0 0 2.11 2.107c1.883.511 9.388.511 9.388.511s7.505 0 9.388-.511a3.002 3.002 0 0 0 2.11-2.107C24 15.947 24 12 24 12s0-3.947-.502-5.837z"
-      fill="#FF0000"
-    />
-    <path
-      d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z"
-      fill="#FFFFFF"
-    />
-  </svg>
-);
-
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +110,7 @@ export default function LoginPage() {
 
           <p className="text-on-surface-variant text-base leading-relaxed font-literata">
             OluOra syncs your video catalog and comment stream directly from
-            YouTube, clustering viewer feedback to extract real, actionable
+            YouTube and TikTok, clustering viewer feedback to extract real, actionable
             ideas.
           </p>
 
@@ -153,7 +135,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <h4 className="font-semibold text-primary text-sm">
-                  Direct YouTube Sync
+                  Multi-Platform Sync
                 </h4>
                 <p className="text-xs text-on-surface-variant">
                   Fetch and save video assets securely with OAuth credentials.
@@ -186,7 +168,7 @@ export default function LoginPage() {
           <div className="w-full bg-white/70 backdrop-blur-lg border border-outline-variant/30 rounded-3xl p-8 md:p-10 shadow-2xl relative">
             <div className="flex flex-col items-center gap-6">
               <div className="w-16 h-16 rounded-2xl bg-primary-container/10 flex items-center justify-center">
-                <YoutubeLogo className="w-8 h-8" />
+                <GoogleLogo />
               </div>
 
               <div className="text-center">
@@ -194,8 +176,8 @@ export default function LoginPage() {
                   Creator Sign In
                 </h2>
                 <p className="text-sm text-on-surface-variant font-literata mt-1">
-                  Authorize read-only access to YouTube channels and video
-                  comments
+                  Sign in to create your account. Connect YouTube or TikTok
+                  from your dashboard.
                 </p>
               </div>
 

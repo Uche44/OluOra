@@ -33,7 +33,7 @@ async def test_youtube_sync_success(
 
     social = SocialAccount(
         user_id=user.id,
-        provider="google",
+        provider="youtube",
         provider_user_id="google-id-creator-111",
         access_token="google-valid-access-token",
         refresh_token="google-valid-refresh-token",
@@ -108,7 +108,7 @@ async def test_youtube_sync_success(
     channel_res = await db.execute(channel_query)
     channel = channel_res.scalar_one_or_none()
     assert channel is not None
-    assert channel.youtube_channel_id == "UC_channel_123"
+    assert channel.external_id == "UC_channel_123"
     assert channel.title == "Olu Tech Reviews"
     assert channel.subscriber_count == 15000
 
@@ -116,10 +116,10 @@ async def test_youtube_sync_success(
     videos_res = await db.execute(videos_query)
     videos = videos_res.scalars().all()
     assert len(videos) == 2
-    assert videos[0].youtube_video_id == "video-id-001"
+    assert videos[0].external_id == "video-id-001"
     assert videos[0].title == "Unboxing Phone 16"
     assert videos[0].comment_count == 22
-    assert videos[1].youtube_video_id == "video-id-002"
+    assert videos[1].external_id == "video-id-002"
 
 @patch("app.integrations.google.refresh_google_access_token", new_callable=AsyncMock)
 @patch("app.integrations.youtube.fetch_channel_details", new_callable=AsyncMock)
@@ -146,7 +146,7 @@ async def test_youtube_sync_token_expired_refresh(
     expired_time = datetime.now(timezone.utc) - timedelta(minutes=10)
     social = SocialAccount(
         user_id=user.id,
-        provider="google",
+        provider="youtube",
         provider_user_id="google-id-expired-333",
         access_token="expired-access-token",
         refresh_token="valid-refresh-token",

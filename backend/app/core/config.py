@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     GOOGLE_REDIRECT_URI: str
+    # Separate redirect for the "connect YouTube" consent flow.
+    GOOGLE_YOUTUBE_REDIRECT_URI: str = "http://localhost:3000/auth/youtube/callback"
+
+    # TikTok OAuth (Login Kit)
+    TIKTOK_CLIENT_KEY: str = ""
+    TIKTOK_CLIENT_SECRET: str = ""
+    # Must be an HTTPS, registered redirect URI (no query params/fragments).
+    TIKTOK_REDIRECT_URI: str = ""
 
     # JWT Authentication
     JWT_SECRET: str = _INSECURE_JWT_SECRET_DEFAULT

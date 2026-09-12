@@ -22,7 +22,7 @@ async def test_get_analysis_insights_success(client: AsyncClient, db: AsyncSessi
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_insights_router",
+        external_id="UC_insights_router",
         title="Insights Channel",
         subscriber_count=5000,
         video_count=1
@@ -33,7 +33,7 @@ async def test_get_analysis_insights_success(client: AsyncClient, db: AsyncSessi
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-insights-router",
+        external_id="video-insights-router",
         title="Testing Router Insights",
         published_at=datetime.now(timezone.utc),
         sync_status="completed"
@@ -119,7 +119,7 @@ async def test_get_analysis_recommendations_success(client: AsyncClient, db: Asy
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_recs_router",
+        external_id="UC_recs_router",
         title="Recs Channel",
         subscriber_count=1000,
         video_count=1
@@ -130,7 +130,7 @@ async def test_get_analysis_recommendations_success(client: AsyncClient, db: Asy
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-recs-router",
+        external_id="video-recs-router",
         title="Testing Router Recommendations",
         published_at=datetime.now(timezone.utc),
         sync_status="completed"
@@ -202,7 +202,7 @@ async def test_run_analysis_success(client: AsyncClient, db: AsyncSession):
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_run_router",
+        external_id="UC_run_router",
         title="Run Channel",
         subscriber_count=1000,
         video_count=1
@@ -213,7 +213,7 @@ async def test_run_analysis_success(client: AsyncClient, db: AsyncSession):
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-run-router",
+        external_id="video-run-router",
         title="Testing Router Run",
         published_at=datetime.now(timezone.utc),
         sync_status="completed"
@@ -248,7 +248,7 @@ async def test_get_analysis_history_success(client: AsyncClient, db: AsyncSessio
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_hist_router",
+        external_id="UC_hist_router",
         title="Hist Channel",
         subscriber_count=1000,
         video_count=1
@@ -259,7 +259,7 @@ async def test_get_analysis_history_success(client: AsyncClient, db: AsyncSessio
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-hist-router",
+        external_id="video-hist-router",
         title="Testing Router History",
         published_at=datetime.now(timezone.utc),
         sync_status="completed"
@@ -298,7 +298,7 @@ async def test_get_analysis_run_details(client: AsyncClient, db: AsyncSession):
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_run_det_router",
+        external_id="UC_run_det_router",
         title="Run Det Channel",
         subscriber_count=1000,
         video_count=1
@@ -309,7 +309,7 @@ async def test_get_analysis_run_details(client: AsyncClient, db: AsyncSession):
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-run-det-router",
+        external_id="video-run-det-router",
         title="Testing Router Run Det",
         published_at=datetime.now(timezone.utc),
         sync_status="completed"
@@ -344,7 +344,7 @@ async def test_get_latest_analysis_success(client: AsyncClient, db: AsyncSession
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_latest_router",
+        external_id="UC_latest_router",
         title="Latest Channel",
         subscriber_count=1000,
         video_count=1
@@ -355,7 +355,7 @@ async def test_get_latest_analysis_success(client: AsyncClient, db: AsyncSession
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-latest-router",
+        external_id="video-latest-router",
         title="Testing Router Latest",
         published_at=datetime.now(timezone.utc),
         sync_status="completed"
@@ -397,7 +397,7 @@ async def test_get_analysis_clusters_success(client: AsyncClient, db: AsyncSessi
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_clusters_router",
+        external_id="UC_clusters_router",
         title="Clusters Channel",
         subscriber_count=1000,
         video_count=1
@@ -408,7 +408,7 @@ async def test_get_analysis_clusters_success(client: AsyncClient, db: AsyncSessi
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-clusters-router",
+        external_id="video-clusters-router",
         title="Testing Router Clusters",
         published_at=datetime.now(timezone.utc),
         sync_status="completed"

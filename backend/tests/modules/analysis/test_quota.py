@@ -13,7 +13,7 @@ from app.core.security import create_access_token
 from app.modules.users.quota import (
     get_daily_quota_used,
     verify_quota_limit,
-    log_youtube_quota
+    log_api_quota
 )
 from app.modules.analysis.services import run_queued_analysis_job
 
@@ -38,12 +38,12 @@ async def test_quota_tracking_and_verification(db: AsyncSession):
     await verify_quota_limit(db, user.id, planned_cost=10)
 
     # 4. Log quota consumption
-    await log_youtube_quota(db, user.id, "commentThreads.list", 100)
+    await log_api_quota(db, user.id, "commentThreads.list", 100)
     used = await get_daily_quota_used(db, user.id)
     assert used == 100
 
     # 5. Log up to the 500 limit
-    await log_youtube_quota(db, user.id, "commentThreads.list", 400)
+    await log_api_quota(db, user.id, "commentThreads.list", 400)
     
     # 6. Verify quota limit raises error now that ceiling is hit
     with pytest.raises(ValueError) as exc:
@@ -60,7 +60,7 @@ async def test_analyze_endpoint_quota_exceeded(client: AsyncClient, db: AsyncSes
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_quota_chan",
+        external_id="UC_quota_chan",
         title="Quota Channel",
         subscriber_count=10,
         video_count=1
@@ -71,7 +71,7 @@ async def test_analyze_endpoint_quota_exceeded(client: AsyncClient, db: AsyncSes
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-quota-fail",
+        external_id="video-quota-fail",
         title="Quota Video Fail",
         published_at=datetime.now(timezone.utc),
         sync_status="pending"
@@ -81,7 +81,7 @@ async def test_analyze_endpoint_quota_exceeded(client: AsyncClient, db: AsyncSes
     await db.refresh(video)
 
     # Force daily quota to be fully consumed (500 units)
-    await log_youtube_quota(db, user.id, "commentThreads.list", 500)
+    await log_api_quota(db, user.id, "commentThreads.list", 500)
 
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
@@ -102,7 +102,7 @@ async def test_job_queue_creation_and_execution_success(client: AsyncClient, db:
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_job_chan",
+        external_id="UC_job_chan",
         title="Job Channel",
         subscriber_count=10,
         video_count=1
@@ -113,7 +113,7 @@ async def test_job_queue_creation_and_execution_success(client: AsyncClient, db:
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-job-ok",
+        external_id="video-job-ok",
         title="Job Video Ok",
         published_at=datetime.now(timezone.utc),
         sync_status="pending"

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.youtube.models import Video, Channel
 from app.modules.comments.models import Comment
 from app.integrations import youtube
-from app.modules.users.quota import verify_quota_limit, log_youtube_quota
+from app.modules.users.quota import verify_quota_limit, log_api_quota
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
     if latest_published_at and latest_published_at.tzinfo is None:
         latest_published_at = latest_published_at.replace(tzinfo=timezone.utc)
         
-    logger.info(f"Syncing comments for video {video.youtube_video_id}. Latest stored comment: {latest_published_at}")
+    logger.info(f"Syncing comments for video {video.external_id}. Latest stored comment: {latest_published_at}")
     
     new_comments_count = 0
     page_token = None
@@ -50,7 +50,7 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
             req_etag = video.etag if page_token is None else None
             response_data = await youtube.fetch_comment_threads(
                 access_token=access_token,
-                video_id=video.youtube_video_id,
+                video_id=video.external_id,
                 max_results=100,
                 page_token=page_token,
                 etag=req_etag
@@ -58,7 +58,7 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
             
             # If ETag matched (HTTP 304)
             if response_data.get("etag_matched"):
-                logger.info(f"ETag matched for video {video.youtube_video_id}. Comments unchanged.")
+                logger.info(f"ETag matched for video {video.external_id}. Comments unchanged.")
                 video.last_synced_at = datetime.now(timezone.utc)
                 video.sync_status = "completed"
                 db.add(video)
@@ -72,14 +72,14 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
                     video.etag = new_etag
                     db.add(video)
 
-            await log_youtube_quota(db, user_id, "commentThreads.list", 1)
+                await log_api_quota(db, user_id, "commentThreads.list", 1)
         except Exception as e:
             if str(e) == "COMMENTS_DISABLED":
                 video.sync_status = "disabled"
                 video.last_synced_at = datetime.now(timezone.utc)
                 db.add(video)
                 await db.commit()
-                logger.warning(f"Comments are disabled for video {video.youtube_video_id}")
+                logger.warning(f"Comments are disabled for video {video.external_id}")
                 return 0
             logger.error(f"Failed to fetch comment threads: {e}")
             raise
@@ -112,14 +112,14 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
             like_count = int(top_snippet.get("likeCount", 0))
             
             # Check if comment already exists (failsafe)
-            exists_stmt = select(Comment).where(Comment.youtube_comment_id == top_comment_id)
+            exists_stmt = select(Comment).where(Comment.external_id == top_comment_id)
             exists_result = await db.execute(exists_stmt)
             comment_db = exists_result.scalar_one_or_none()
             
             if not comment_db:
                 comment_db = Comment(
                     video_id=video.id,
-                    youtube_comment_id=top_comment_id,
+                    external_id=top_comment_id,
                     author_name=author_name,
                     author_profile_image=author_profile_image,
                     text=text,
@@ -156,14 +156,14 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
                 r_text = reply_snippet.get("textDisplay", "")
                 r_like_count = int(reply_snippet.get("likeCount", 0))
                 
-                reply_exists_stmt = select(Comment).where(Comment.youtube_comment_id == reply_id)
+                reply_exists_stmt = select(Comment).where(Comment.external_id == reply_id)
                 reply_exists_result = await db.execute(reply_exists_stmt)
                 reply_db = reply_exists_result.scalar_one_or_none()
                 
                 if not reply_db:
                     reply_db = Comment(
                         video_id=video.id,
-                        youtube_comment_id=reply_id,
+                        external_id=reply_id,
                         author_name=r_author_name,
                         author_profile_image=r_author_profile_image,
                         text=r_text,
