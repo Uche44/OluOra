@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import providers
+from app.core.capabilities import comment_analysis_supported
 from app.core.db import get_db
 from app.dependencies.auth import get_current_user
 from app.modules.users.models import User
@@ -149,26 +150,28 @@ async def trigger_analysis(
             }
         )
 
-    # Analysis depends on comment ingestion, which is YouTube-only.
-    if video.platform != providers.YOUTUBE:
+    # Analysis depends on comment ingestion being available for the platform.
+    if not comment_analysis_supported(video.platform):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": "COMMENTS_NOT_SUPPORTED",
-                "message": "TikTok comment analysis is coming soon."
+                "message": "Comment analysis is not available for this platform right now."
             }
         )
 
-    # 2. Retrieve the connected YouTube account & refresh its token
-    social = await get_social_account(db, current_user.id, providers.YOUTUBE)
-
+    # 2. YouTube ingestion needs a refreshed Google token. TikTok comments are
+    #    fetched by video URL, so no per-user provider token is required.
     google_token = None
-    if social:
-        try:
-            google_token = await get_or_refresh_social_token(db, social)
-        except Exception:
-            # Continue analysis even if OAuth refresh fails (will use local comments cache)
-            pass
+    if video.platform == providers.YOUTUBE:
+        social = await get_social_account(db, current_user.id, providers.YOUTUBE)
+
+        if social:
+            try:
+                google_token = await get_or_refresh_social_token(db, social)
+            except Exception:
+                # Continue analysis even if OAuth refresh fails (will use local comments cache)
+                pass
 
     # 3. Create a new immutable Analysis run record
     analysis = Analysis(

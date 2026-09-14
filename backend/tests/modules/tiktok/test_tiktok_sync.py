@@ -140,7 +140,11 @@ async def test_tiktok_sync_without_connection(client: AsyncClient, db: AsyncSess
     assert response.json()["detail"]["code"] == "ACCOUNT_NOT_CONNECTED"
 
 
-async def test_tiktok_comments_are_not_supported(client: AsyncClient, db: AsyncSession):
+async def test_tiktok_comments_are_not_supported(client: AsyncClient, db: AsyncSession, monkeypatch):
+    # No comment provider configured: TikTok analysis must stay hard-disabled.
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "SCRAPECREATORS_API_KEY", "")
+
     user, _ = await _make_user_with_tiktok(db, "tiktok_comments@example.com")
     channel = Channel(
         creator_id=user.id,

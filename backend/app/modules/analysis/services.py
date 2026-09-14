@@ -298,7 +298,7 @@ async def generate_insights_for_analysis(
 
         # 3. Construct prompts
         system_prompt = (
-            "You are a helpful YouTube audience analyst writing for content creators who are not tech-savvy. "
+            "You are a helpful audience analyst writing for content creators who are not tech-savvy. "
             "Your job is to analyze groups of viewer comments and turn them into clear, plain-English insights.\n"
             "IMPORTANT writing rules:\n"
             "- Use simple, everyday language. Avoid jargon, academic words, and technical terms.\n"
@@ -422,14 +422,18 @@ async def run_queued_analysis_job(
 ) -> None:
     """
     Background worker that retrieves a queued analysis job and executes it:
-    1. Synchronizes YouTube comments for the video (if a token is provided), checking quota.
+    1. Synchronizes comments for the video from its platform source, checking quota.
     2. Generates semantic embeddings for comments.
     3. Clusters comments using KMeans.
     4. Auto-titles clusters and generates structured insights via Groq.
     Updates AnalysisJob and Analysis statuses dynamically.
     """
+    from app.core import providers
     from app.core.db import SessionLocal
-    from app.modules.comments.services import sync_comments_for_video
+    from app.modules.comments.services import (
+        sync_comments_for_video,
+        sync_tiktok_comments_for_video,
+    )
     from app.modules.youtube.models import Video
     from app.modules.analysis.models import Analysis, AnalysisJob
 
@@ -479,9 +483,12 @@ async def run_queued_analysis_job(
             return
 
         try:
-            # Step A: Synchronize YouTube comments (if token provided)
-            if google_token:
-                logger.info(f"Syncing comments for video {video_id} in background queue...")
+            # Step A: Synchronize comments from the video's platform source
+            if video.platform == providers.TIKTOK:
+                logger.info(f"Syncing TikTok comments for video {video_id} in background queue...")
+                await sync_tiktok_comments_for_video(db, video)
+            elif google_token:
+                logger.info(f"Syncing YouTube comments for video {video_id} in background queue...")
                 await sync_comments_for_video(db, video, google_token)
 
             # Step B: Generate embeddings

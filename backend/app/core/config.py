@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     # Must be an HTTPS, registered redirect URI (no query params/fragments).
     TIKTOK_REDIRECT_URI: str = ""
 
+    # TikTok comment ingestion (ScrapeCreators)
+    # TikTok's Display API exposes no comment-read endpoint to commercial apps, so
+    # public comments are sourced from a third-party provider. Leaving this key
+    # empty keeps TikTok videos metadata-only.
+    SCRAPECREATORS_API_KEY: str = ""
+    SCRAPECREATORS_BASE_URL: str = "https://api.scrapecreators.com"
+
     # JWT Authentication
     JWT_SECRET: str = _INSECURE_JWT_SECRET_DEFAULT
     JWT_ALGORITHM: str = "HS256"

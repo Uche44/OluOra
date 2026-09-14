@@ -5,7 +5,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.youtube.models import Video, Channel
 from app.modules.comments.models import Comment
-from app.integrations import youtube
+from app.integrations import scrapecreators, youtube
 from app.modules.users.quota import verify_quota_limit, log_api_quota
 
 logger = logging.getLogger(__name__)
@@ -191,4 +191,82 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
     await db.commit()
     
     logger.info(f"Comments sync completed. Synced {new_comments_count} comments.")
+    return new_comments_count
+
+
+async def sync_tiktok_comments_for_video(
+    db: AsyncSession, video: Video, max_comments_limit: int = 500
+) -> int:
+    """Sync a TikTok video's top-level public comments via the third-party provider.
+
+    TikTok's Display API exposes no comment-read endpoint, so comments are sourced
+    from ScrapeCreators and paged by cursor. Each page is billed as one request,
+    so quota is checked (and logged) per page exactly like the YouTube path.
+
+    Only top-level comments are ingested here; replies live behind a separate
+    provider endpoint and are deliberately out of scope.
+    """
+    if not scrapecreators.is_configured():
+        raise ValueError("COMMENTS_NOT_SUPPORTED")
+    if not video.url:
+        # Videos imported before URL capture was added must be re-synced first.
+        raise ValueError("VIDEO_URL_MISSING")
+
+    creator_query = select(Channel.creator_id).where(Channel.id == video.channel_id)
+    user_id = (await db.execute(creator_query)).scalar_one()
+
+    new_comments_count = 0
+    total_fetched = 0
+    cursor = None
+
+    while total_fetched < max_comments_limit:
+        await verify_quota_limit(db, user_id, planned_cost=1)
+
+        payload = await scrapecreators.fetch_video_comments(video.url, cursor=cursor)
+        await log_api_quota(db, user_id, "scrapecreators.tiktok.comments", 1)
+
+        page_comments = scrapecreators.normalize_comments(payload)
+        if not page_comments:
+            break
+
+        for item in page_comments:
+            exists_result = await db.execute(
+                select(Comment).where(Comment.external_id == item.external_id)
+            )
+            comment_db = exists_result.scalar_one_or_none()
+
+            if not comment_db:
+                comment_db = Comment(
+                    video_id=video.id,
+                    external_id=item.external_id,
+                    author_name=item.author_name,
+                    author_profile_image=item.author_profile_image,
+                    text=item.text,
+                    like_count=item.like_count,
+                    published_at=item.published_at,
+                    parent_id=None,
+                )
+                db.add(comment_db)
+                new_comments_count += 1
+            else:
+                comment_db.like_count = item.like_count
+                comment_db.text = item.text
+                comment_db.author_name = item.author_name
+                comment_db.author_profile_image = item.author_profile_image
+                db.add(comment_db)
+
+            total_fetched += 1
+            if total_fetched >= max_comments_limit:
+                break
+
+        cursor = scrapecreators.next_cursor(payload)
+        if cursor is None:
+            break
+
+    video.last_synced_at = datetime.now(timezone.utc)
+    video.sync_status = "completed"
+    db.add(video)
+    await db.commit()
+
+    logger.info(f"TikTok comments sync completed. Synced {new_comments_count} comments.")
     return new_comments_count

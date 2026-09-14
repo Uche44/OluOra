@@ -25,8 +25,9 @@ def _parse_create_time(value) -> datetime:
 async def sync_tiktok_data(db: AsyncSession, user: User, max_videos: int = 50) -> int:
     """Sync the creator's TikTok profile and public video catalog via the Display API.
 
-    TikTok exposes no comment-read endpoint for commercial apps, so only channel
-    and video metadata are imported here.
+    The Display API exposes no comment-read endpoint, so only channel and video
+    metadata are imported here. Comments are ingested separately through the
+    third-party provider in ``app.integrations.scrapecreators``.
     """
     # 1. Fetch connected TikTok account
     social = await get_social_account(db, user.id, providers.TIKTOK)
@@ -111,6 +112,11 @@ async def sync_tiktok_data(db: AsyncSession, user: User, max_videos: int = 50) -
             video.title = title_value[:255]
             video.description = description
             video.thumbnail_url = item.get("cover_image_url")
+            # Kept so comment ingestion can address the video by URL. Only
+            # overwritten when TikTok returns one, so re-syncs cannot erase it.
+            share_url = item.get("share_url")
+            if share_url:
+                video.url = share_url
             video.published_at = _parse_create_time(item.get("create_time"))
             video.view_count = int(item.get("view_count") or 0)
             video.like_count = int(item.get("like_count") or 0)
