@@ -19,7 +19,8 @@ import {
 
 interface VideoItem {
   id: string;
-  youtube_video_id: string;
+  platform: string;
+  external_id: string;
   title: string;
   description: string;
   thumbnail_url: string;
@@ -40,6 +41,7 @@ export default function VideosPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusTab, setStatusTab] = useState<"all" | "analyzed" | "pending">("all");
+  const [platformTab, setPlatformTab] = useState<"all" | "youtube" | "tiktok">("all");
   const [sortBy, setSortBy] = useState("published_at");
   const [currentPage, setCurrentPage] = useState(1);
   
@@ -70,6 +72,9 @@ export default function VideosPage() {
       if (statusTab !== "all") {
         url += `&status=${statusTab}`;
       }
+      if (platformTab !== "all") {
+        url += `&platform=${platformTab}`;
+      }
 
       const res = await authedFetch(url);
       if (res.ok) {
@@ -82,7 +87,7 @@ export default function VideosPage() {
     } finally {
       setTimeout(() => setLoading(false), 0);
     }
-  }, [currentPage, statusTab, sortBy, debouncedSearch]);
+  }, [currentPage, statusTab, platformTab, sortBy, debouncedSearch]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -94,19 +99,38 @@ export default function VideosPage() {
   const handleSync = async () => {
     setSyncing(true);
     setSyncCount(null);
+    setSyncResult(null);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      
-      const res = await authedFetch(`${apiUrl}/api/v1/youtube/sync?limit=24`, {
-        method: "POST"
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSyncCount(data.videos_imported);
-        fetchVideos();
+      const providers = ["youtube", "tiktok"] as const;
+      let totalImported = 0;
+      let anySucceeded = false;
+
+      for (const provider of providers) {
+        try {
+          const res = await authedFetch(`${apiUrl}/api/v1/${provider}/sync?limit=24`, {
+            method: "POST"
+          });
+          if (res.ok) {
+            const data = await res.json();
+            totalImported += data.videos_imported ?? 0;
+            anySucceeded = true;
+          }
+        } catch (e) {
+          // Provider not connected or temporarily unavailable; try the next one.
+          console.error(`Failed to sync ${provider}`, e);
+        }
       }
-    } catch (e) {
-      console.error(e);
+
+      if (anySucceeded) {
+        setSyncCount(totalImported);
+        fetchVideos();
+      } else {
+        setSyncResult({
+          success: false,
+          message: "No connected channel to sync. Connect YouTube or TikTok in Settings."
+        });
+      }
     } finally {
       setSyncing(false);
     }
@@ -278,6 +302,7 @@ export default function VideosPage() {
       {/* Filters Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-outline-variant/20 pb-4">
         {/* Tab Pills */}
+        <div className="flex flex-wrap items-center gap-4">
         <div className="flex gap-2">
           {([
             { id: "all", label: "All Videos" },
@@ -303,6 +328,35 @@ export default function VideosPage() {
               </button>
             );
           })}
+        </div>
+
+        {/* Platform Filter Pills */}
+        <div className="flex gap-2 sm:border-l sm:border-outline-variant/20 sm:pl-4">
+          {([
+            { id: "all", label: "All Platforms" },
+            { id: "youtube", label: "YouTube" },
+            { id: "tiktok", label: "TikTok" }
+          ] as const).map((tab) => {
+            const isActive = platformTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setPlatformTab(tab.id);
+                  setCurrentPage(1);
+                }}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-xs font-semibold font-literata transition-all cursor-pointer border",
+                  isActive
+                    ? "bg-secondary-container text-primary border-transparent"
+                    : "border-outline-variant/30 text-on-surface-variant hover:bg-surface-container hover:text-primary"
+                )}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
         </div>
 
         {/* Sorting Dropdown & Search */}
@@ -396,6 +450,18 @@ export default function VideosPage() {
                     </div>
                   )}
 
+                  {/* Top-Right Platform Badge */}
+                  <div className="absolute top-3 right-3">
+                    <span className={cn(
+                      "text-[10px] font-bold font-literata px-2.5 py-1 rounded-full shadow-sm border",
+                      video.platform === "tiktok"
+                        ? "bg-white/95 text-primary border-outline-variant/30"
+                        : "bg-white/95 text-red-700 border-red-200"
+                    )}>
+                      {video.platform === "tiktok" ? "TikTok" : "YouTube"}
+                    </span>
+                  </div>
+
                   {/* Top-Left Analysis Status Badge */}
                   <div className="absolute top-3 left-3">
                     {isAnalyzed ? (
@@ -450,6 +516,14 @@ export default function VideosPage() {
                       >
                         View Insights
                       </Link>
+                    ) : video.platform !== "youtube" ? (
+                      <button
+                        disabled
+                        title="TikTok does not expose a comment API for standard apps."
+                        className="w-full bg-surface-container-low text-on-surface-variant/60 font-literata text-xs font-semibold py-2.5 rounded-xl border border-outline-variant/10 text-center cursor-not-allowed"
+                      >
+                        Comment analysis coming soon
+                      </button>
                     ) : video.sync_status === "disabled" ? (
                       <button 
                         disabled 

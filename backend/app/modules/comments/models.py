@@ -11,7 +11,7 @@ class Comment(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     video_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)
-    youtube_comment_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    external_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     author_name: Mapped[str] = mapped_column(String(255), nullable=False)
     author_profile_image: Mapped[str | None] = mapped_column(String(500), nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)

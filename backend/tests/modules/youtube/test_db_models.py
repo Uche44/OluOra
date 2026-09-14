@@ -27,7 +27,7 @@ async def test_full_database_relationships_and_cascades(db: AsyncSession):
     # 2. Create SocialAccount linked to User
     social = SocialAccount(
         user_id=user.id,
-        provider="google",
+        provider="youtube",
         provider_user_id="google-12345",
         access_token="access-token-xyz",
         refresh_token="refresh-token-xyz",
@@ -43,7 +43,7 @@ async def test_full_database_relationships_and_cascades(db: AsyncSession):
     # 3. Create Channel managed by user
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC1234567890",
+        external_id="UC1234567890",
         title="Olu Tech Reviews",
         description="YouTube Channel for tech reviews",
         subscriber_count=10000,
@@ -59,7 +59,7 @@ async def test_full_database_relationships_and_cascades(db: AsyncSession):
     # 4. Create Video belonging to Channel
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-xyz123",
+        external_id="video-xyz123",
         title="My First Video Review",
         description="Reviewing new tech devices",
         published_at=datetime.now(timezone.utc),
@@ -78,7 +78,7 @@ async def test_full_database_relationships_and_cascades(db: AsyncSession):
     # 5. Create Parent Comment and a Child Reply (self-referencing threads)
     parent_comment = Comment(
         video_id=video.id,
-        youtube_comment_id="comment-1",
+        external_id="comment-1",
         author_name="Viewer A",
         text="This video is awesome!",
         like_count=5,
@@ -90,7 +90,7 @@ async def test_full_database_relationships_and_cascades(db: AsyncSession):
 
     child_reply = Comment(
         video_id=video.id,
-        youtube_comment_id="reply-1",
+        external_id="reply-1",
         author_name="Olu Creator",
         text="Thank you for watching!",
         like_count=2,

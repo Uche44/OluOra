@@ -21,7 +21,7 @@ async def test_sync_comments_success(mock_fetch, db: AsyncSession):
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_test_sync",
+        external_id="UC_test_sync",
         title="Sync Tester Channel",
         subscriber_count=100,
         video_count=1
@@ -32,7 +32,7 @@ async def test_sync_comments_success(mock_fetch, db: AsyncSession):
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-123",
+        external_id="video-123",
         title="Testing Comment Retrieval",
         published_at=datetime.now(timezone.utc) - timedelta(days=1),
         sync_status="pending"
@@ -91,14 +91,14 @@ async def test_sync_comments_success(mock_fetch, db: AsyncSession):
     
     # Parent comment checks
     parent = comments[0]
-    assert parent.youtube_comment_id == "comment-parent-001"
+    assert parent.external_id == "comment-parent-001"
     assert parent.author_name == "Top Level Commenter"
     assert parent.text == "Excellent video tutorial!"
     assert parent.parent_id is None
     
     # Reply comment checks
     reply = comments[1]
-    assert reply.youtube_comment_id == "comment-reply-001"
+    assert reply.external_id == "comment-reply-001"
     assert reply.author_name == "Reply Commenter"
     assert reply.text == "Agreed, really helped."
     assert reply.parent_id == parent.id
@@ -119,7 +119,7 @@ async def test_sync_comments_delta_fetching(mock_fetch, db: AsyncSession):
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_test_delta",
+        external_id="UC_test_delta",
         title="Delta Channel",
         subscriber_count=50,
         video_count=1
@@ -130,7 +130,7 @@ async def test_sync_comments_delta_fetching(mock_fetch, db: AsyncSession):
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-delta",
+        external_id="video-delta",
         title="Testing Delta Sync",
         published_at=datetime.now(timezone.utc) - timedelta(days=2),
         sync_status="pending"
@@ -142,7 +142,7 @@ async def test_sync_comments_delta_fetching(mock_fetch, db: AsyncSession):
     # Put a comment in the DB to act as the watermark/cursor
     existing_comment = Comment(
         video_id=video.id,
-        youtube_comment_id="comment-old-111",
+        external_id="comment-old-111",
         author_name="Old Poster",
         text="This is an old comment.",
         published_at=datetime.fromisoformat("2026-07-06T10:00:00+00:00")
@@ -210,7 +210,7 @@ async def test_sync_comments_disabled(mock_fetch, db: AsyncSession):
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_test_disabled",
+        external_id="UC_test_disabled",
         title="Disabled Channel",
         subscriber_count=10,
         video_count=1
@@ -221,7 +221,7 @@ async def test_sync_comments_disabled(mock_fetch, db: AsyncSession):
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-disabled",
+        external_id="video-disabled",
         title="Testing Disabled Comments",
         published_at=datetime.now(timezone.utc) - timedelta(days=2),
         sync_status="pending"

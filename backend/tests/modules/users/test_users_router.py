@@ -27,7 +27,7 @@ async def test_get_me_success(client: AsyncClient, db: AsyncSession):
     # Create social connection
     social = SocialAccount(
         user_id=user.id,
-        provider="google",
+        provider="youtube",
         provider_user_id="google-id-12345",
         access_token="access-token",
         refresh_token="refresh-token",
@@ -38,7 +38,7 @@ async def test_get_me_success(client: AsyncClient, db: AsyncSession):
     # Create connected channel
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_settings_channel",
+        external_id="UC_settings_channel",
         title="Settings Channel",
         subscriber_count=1000,
         video_count=10
@@ -55,7 +55,7 @@ async def test_get_me_success(client: AsyncClient, db: AsyncSession):
     assert data["email"] == "test_settings_user@gmail.com"
     assert data["full_name"] == "Settings User"
     assert len(data["connections"]) == 1
-    assert data["connections"][0]["provider"] == "google"
+    assert data["connections"][0]["provider"] == "youtube"
     assert len(data["channels"]) == 1
     assert data["channels"][0]["title"] == "Settings Channel"
 
@@ -92,7 +92,7 @@ async def test_disconnect_provider_success(client: AsyncClient, db: AsyncSession
     # Create social connection
     social = SocialAccount(
         user_id=user.id,
-        provider="google",
+        provider="youtube",
         provider_user_id="google-id-disconnect",
         access_token="access-token",
         refresh_token="refresh-token",
@@ -103,7 +103,7 @@ async def test_disconnect_provider_success(client: AsyncClient, db: AsyncSession
     # Create connected channel
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_disconnect_channel",
+        external_id="UC_disconnect_channel",
         title="Disconnect Channel",
         subscriber_count=1000,
         video_count=10
@@ -115,7 +115,7 @@ async def test_disconnect_provider_success(client: AsyncClient, db: AsyncSession
     headers = {"Authorization": f"Bearer {token}"}
 
     # Disconnect
-    response = await client.post("/api/v1/users/disconnect/google", headers=headers)
+    response = await client.post("/api/v1/users/disconnect/youtube", headers=headers)
     assert response.status_code == 200
     assert response.json()["status"] == "success"
 

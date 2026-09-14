@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(venv/bin/alembic:*)",
+      "Shell(venv/bin/python:*)",
+      "Shell(ls:*)",
+      "Shell(npx tsc --noEmit 2 >& 1)",
+      "Shell(npx tsc --noEmit)",
+      "Shell(npm:*)",
+      "Shell(npx eslint src --format compact 2 >& 1)",
+      "Shell(grep:*)",
+      "Shell(sed:*)",
+      "Shell(awk:*)",
+      "Shell(curl -s -o /dev/null -w backend 8000 -> %{http_code}\\n --max-time 3 http://localhost:8000/health)",
+      "Shell(curl -s -o /dev/null -w frontend 3000 -> %{http_code}\\n --max-time 3 http://localhost:3000/)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

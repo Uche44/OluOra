@@ -19,7 +19,7 @@ async def create_mock_user(db: AsyncSession, email: str, name: str) -> User:
 async def create_mock_channel(db: AsyncSession, creator_id: uuid.UUID, youtube_id: str, title: str) -> Channel:
     channel = Channel(
         creator_id=creator_id,
-        youtube_channel_id=youtube_id,
+        external_id=youtube_id,
         title=title,
         subscriber_count=1000
     )
@@ -40,7 +40,7 @@ async def create_mock_video(
 ) -> Video:
     video = Video(
         channel_id=channel_id,
-        youtube_video_id=youtube_id,
+        external_id=youtube_id,
         title=title,
         description=desc,
         published_at=datetime.now(timezone.utc),
@@ -75,7 +75,7 @@ async def test_get_videos_ownership_isolation(client: AsyncClient, db: AsyncSess
     
     assert "data" in data
     assert len(data["data"]) == 1
-    assert data["data"][0]["youtube_video_id"] == "v1"
+    assert data["data"][0]["external_id"] == "v1"
     assert data["data"][0]["title"] == "User 1 Video"
     assert data["pagination"]["total"] == 1
 
@@ -94,7 +94,7 @@ async def test_get_videos_search_filter(client: AsyncClient, db: AsyncSession):
     assert response.status_code == 200
     data = response.json()
     assert len(data["data"]) == 1
-    assert data["data"][0]["youtube_video_id"] == "v1"
+    assert data["data"][0]["external_id"] == "v1"
 
     # Search for "tutorial" (matches "Python coding tutorial" in desc)
     response = await client.get("/api/v1/videos?search=tutorial", headers=headers)
@@ -117,14 +117,14 @@ async def test_get_videos_status_filter(client: AsyncClient, db: AsyncSession):
     assert response.status_code == 200
     data = response.json()
     assert len(data["data"]) == 1
-    assert data["data"][0]["youtube_video_id"] == "v1"
+    assert data["data"][0]["external_id"] == "v1"
 
     # Filter for pending
     response = await client.get("/api/v1/videos?status=pending", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data["data"]) == 1
-    assert data["data"][0]["youtube_video_id"] == "v2"
+    assert data["data"][0]["external_id"] == "v2"
 
 async def test_get_videos_sorting_and_pagination(client: AsyncClient, db: AsyncSession):
     user = await create_mock_user(db, "sort@gmail.com", "Sort User")
@@ -141,17 +141,17 @@ async def test_get_videos_sorting_and_pagination(client: AsyncClient, db: AsyncS
     response = await client.get("/api/v1/videos?sort=views", headers=headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["data"][0]["youtube_video_id"] == "v2" # 500 views
-    assert data["data"][1]["youtube_video_id"] == "v3" # 300 views
-    assert data["data"][2]["youtube_video_id"] == "v1" # 10 views
+    assert data["data"][0]["external_id"] == "v2" # 500 views
+    assert data["data"][1]["external_id"] == "v3" # 300 views
+    assert data["data"][2]["external_id"] == "v1" # 10 views
 
     # Pagination: page 1 limit 2 sorted by comments desc (v1=100, v3=50, v2=10)
     response = await client.get("/api/v1/videos?sort=comments&page=1&limit=2", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data["data"]) == 2
-    assert data["data"][0]["youtube_video_id"] == "v1" # 100 comments
-    assert data["data"][1]["youtube_video_id"] == "v3" # 50 comments
+    assert data["data"][0]["external_id"] == "v1" # 100 comments
+    assert data["data"][1]["external_id"] == "v3" # 50 comments
     
     assert data["pagination"]["page"] == 1
     assert data["pagination"]["limit"] == 2

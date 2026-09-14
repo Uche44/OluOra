@@ -1,9 +1,53 @@
 tiktok for developers documentation: `https://developers.tiktok.com/doc/overview`
 youtube api documentation: `https://developers.google.com/youtube/v3/docs`
 
-OluNdi — API Limitations & Workaround Strategy
-What OluNdi Is
-OluNdi is an AI-powered audience intelligence platform for creators. Its core function is to:
+---
+
+## Implementation Status (TikTok integration)
+
+OluOra now separates **login identity** from **data-provider connections**:
+
+- **Google** is used for sign-in only (identity scopes). It no longer requests YouTube access.
+- **YouTube** and **TikTok** are connected independently from *Dashboard → Settings*.
+
+### What is implemented
+
+| Capability | YouTube | TikTok |
+|---|---|---|
+| OAuth connect/disconnect | ✅ | ✅ (Login Kit) |
+| Channel + video catalog sync | ✅ | ✅ (`Display API /v2/video/list/`) |
+| Comment ingestion | ✅ | ❌ No endpoint for standard apps |
+| AI comment analysis | ✅ | ❌ (UI shows "coming soon") |
+
+### TikTok specifics to remember
+
+- Authorization page: `https://www.tiktok.com/v2/auth/authorize/`
+- Token exchange/refresh: `POST https://open.tiktokapis.com/v2/oauth/token/` (`application/x-www-form-urlencoded`)
+- Revoke: `POST https://open.tiktokapis.com/v2/oauth/revoke/`
+- User info: `GET https://open.tiktokapis.com/v2/user/info/?fields=...`
+- Video list: `POST https://open.tiktokapis.com/v2/video/list/?fields=...` (max 20/page)
+- **Redirect URIs must be HTTPS and static** (no query params/fragments). Local development needs an
+  HTTPS tunnel (e.g. `ngrok http 3000`) registered in the TikTok developer portal.
+- Access token ~24h; refresh token ~365d. **Refresh responses may rotate the refresh token** — always persist it.
+- `cover_image_url` has a **6-hour TTL**, so stored TikTok thumbnails can expire; re-sync refreshes them.
+- `video.list` returns only the creator's own **public** videos; sandbox apps only work with added target users.
+- Display API responses wrap results as `{"data": ..., "error": {"code": "ok"|...}}`.
+
+### Environment variables
+
+```
+GOOGLE_YOUTUBE_REDIRECT_URI=http://localhost:3000/auth/youtube/callback
+TIKTOK_CLIENT_KEY=...
+TIKTOK_CLIENT_SECRET=...
+TIKTOK_REDIRECT_URI=https://<tunnel-domain>/auth/tiktok/callback
+```
+
+---
+
+
+OluOra — API Limitations & Workaround Strategy
+What OluOra Is
+OluOra is an AI-powered audience intelligence platform for creators. Its core function is to:
 
 Authenticate creators via YouTube / TikTok OAuth
 Import their videos
@@ -46,7 +90,7 @@ No way to retrieve comments posted after a specific date without filtering clien
 Authentication (OAuth 2.0)
 Standard Google Sign-In with scope: https://www.googleapis.com/auth/youtube.readonly
 Access tokens expire after 1 hour; refresh tokens must be stored and rotated
-Users must explicitly grant OluNdi access during sign-in
+Users must explicitly grant OluOra access during sign-in
 Quota Extension
 There is no paid tier — you cannot simply buy more quota
 Must submit a YouTube API Services Audit & Quota Extension Form to Google
@@ -54,7 +98,7 @@ Process is manual, subject to review, and can take weeks
 Requires proving your app is Terms-of-Service compliant and quota-efficient
 TikTok API — Limitations (Much More Restrictive)
 The Core Problem: TikTok Has No General-Purpose Comment Read API
-This is the biggest challenge for OluNdi. TikTok's APIs are segmented into two worlds:
+This is the biggest challenge for OluOra. TikTok's APIs are segmented into two worlds:
 
 1. Login Kit / Display API (Standard Apps)
 Enables OAuth login ✅
@@ -72,7 +116,7 @@ Access tokens expire every 2 hours
 Data returned can be inconsistent and incomplete (documented in academic audits)
 WARNING
 
-OluNdi as a commercial SaaS product cannot use the TikTok Research API. It is reserved strictly for non-commercial academic research. This is TikTok's most critical API limitation for this project.
+OluOra as a commercial SaaS product cannot use the TikTok Research API. It is reserved strictly for non-commercial academic research. This is TikTok's most critical API limitation for this project.
 
 TikTok Standard App Restrictions Summary
 Feature	Available?	Notes
@@ -83,7 +127,7 @@ Read comments on public videos	❌	Research API only
 Token lifetime	Short	Requires refresh token management
 App review required	✅	Must pass TikTok audit before going to production
 Sandbox mode	✅	For testing, but SELF_ONLY privacy restrictions
-Workaround Strategies for OluNdi
+Workaround Strategies for OluOra
 YouTube — Workarounds
 1. Aggressive Caching (Most Important)
 Store all fetched comments and video metadata in PostgreSQL. Never re-fetch data you already have.
@@ -94,7 +138,7 @@ Strategy:
 - On subsequent analyses: serve from DB, only fetch *new* comments since last sync
 - Use YouTube API ETags + `If-None-Match` headers → returns 304 (no quota cost) if unchanged
 2. On-Demand, Not Background Fetching
-OluNdi's overview doc already specifies this correctly:
+OluOra's overview doc already specifies this correctly:
 
 "Comment retrieval begins only when analysis is requested."
 
@@ -131,17 +175,17 @@ Approval takes months and may be denied
 Option C: Creator-Submitted Data
 Allow TikTok creators to manually export and upload their comment data
 TikTok allows users to request a data download of their own data (GDPR-style data portability)
-OluNdi could provide a guide on how to export comment data from TikTok Studio and upload a CSV
-OluNdi then runs AI analysis on the uploaded file — no API dependency
+OluOra could provide a guide on how to export comment data from TikTok Studio and upload a CSV
+OluOra then runs AI analysis on the uploaded file — no API dependency
 
 Flow:
 1. Creator downloads their TikTok data (TikTok Studio → Analytics → Comments)
-2. Creator uploads the CSV/JSON file to OluNdi
-3. OluNdi processes the file through the same AI pipeline
+2. Creator uploads the CSV/JSON file to OluOra
+3. OluOra processes the file through the same AI pipeline
 Option D: TikTok's Commercial Content API (Monitor for Updates)
 TikTok periodically updates its API offering. Watch for any future expansion of their Commercial Content API or Creator Marketplace API that may unlock comment-read access for verified SaaS partners.
 
-Implementation Priority for OluNdi
+Implementation Priority for OluOra
 
 Phase 1 (MVP):
 ├── YouTube: Full OAuth + video list + comment fetch + AI analysis ✅

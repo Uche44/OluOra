@@ -1,22 +1,22 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { authedFetch } from "@/lib/api";
-import { 
-  User, 
-  Globe, 
-  ShieldAlert, 
-  RefreshCw, 
-  AlertTriangle, 
+import { authedFetch, startConnectFlow, type DataProvider } from "@/lib/api";
+import {
+  User,
+  Globe,
+  RefreshCw,
+  AlertTriangle,
   CheckCircle,
-  Video
+  Video,
+  Music2,
 } from "lucide-react";
 
 interface ConnectedChannel {
   id: string;
-  youtube_channel_id: string;
+  platform: string;
+  external_id: string;
   title: string;
   description: string | null;
   thumbnail_url: string | null;
@@ -36,24 +36,48 @@ interface UserProfile {
   full_name: string | null;
   profile_picture: string | null;
   is_active: boolean;
+  auth_provider: string;
   created_at: string;
   connections: ConnectedAccount[];
   channels: ConnectedChannel[];
 }
 
+const PROVIDERS: {
+  id: DataProvider;
+  label: string;
+  badgeClass: string;
+  description: string;
+}[] = [
+  {
+    id: "youtube",
+    label: "YouTube",
+    badgeClass: "bg-emerald-100/50 text-emerald-950 border-emerald-200",
+    description: "Sync your channel, videos and comments for full AI analysis.",
+  },
+  {
+    id: "tiktok",
+    label: "TikTok",
+    badgeClass: "bg-slate-900/5 text-slate-900 border-slate-300",
+    description: "Sync your public video catalog. Comment analysis is coming soon.",
+  },
+];
+
 export default function SettingsPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const [flash, setFlash] = useState<string | null>(null);
+
   // Profile update form state
   const [fullName, setFullName] = useState("");
   const [updating, setUpdating] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
 
-  // Disconnection state
-  const [disconnecting, setDisconnecting] = useState(false);
-  const [showConfirmDisconnect, setShowConfirmDisconnect] = useState(false);
+  // Connection state
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -76,6 +100,13 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
+    // Surface a message left by the OAuth connect callback.
+    const pending = sessionStorage.getItem("connect_flash");
+    if (pending) {
+      sessionStorage.removeItem("connect_flash");
+      setFlash(pending);
+      setTimeout(() => setFlash(null), 5000);
+    }
     fetchProfile();
   }, []);
 
@@ -95,14 +126,14 @@ export default function SettingsPage() {
       }
       const data = await res.json();
       setProfile(data);
-      
+
       // Update local storage user details to keep layout synced
       localStorage.setItem("user", JSON.stringify({
         email: data.email,
         full_name: data.full_name,
         profile_picture: data.profile_picture
       }));
-      
+
       setUpdateSuccess(true);
       setTimeout(() => setUpdateSuccess(false), 3000);
     } catch (err: any) {
@@ -113,25 +144,41 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDisconnect = async () => {
-    setDisconnecting(true);
+  const handleConnect = async (provider: DataProvider) => {
+    setConnecting(provider);
+    setActionError(null);
+    try {
+      await startConnectFlow(provider);
+    } catch (err: any) {
+      console.error(err);
+      setActionError(err.message || `Failed to start the ${provider} connection.`);
+      setConnecting(null);
+    }
+  };
+
+  const handleDisconnect = async (provider: string) => {
+    setDisconnecting(provider);
+    setActionError(null);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await authedFetch(`${apiUrl}/api/v1/users/disconnect/google`, {
+      const res = await authedFetch(`${apiUrl}/api/v1/users/disconnect/${provider}`, {
         method: "POST"
       });
       if (!res.ok) {
-        throw new Error("Failed to disconnect Google connection.");
+        const data = await res.json().catch(() => ({}));
+        const detail = data?.detail;
+        throw new Error(
+          (typeof detail === "string" ? detail : detail?.message) ||
+            `Failed to disconnect ${provider}.`
+        );
       }
-      
-      // Reload profile connections
+      setConfirmDisconnect(null);
       await fetchProfile();
-      setShowConfirmDisconnect(false);
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Failed to disconnect channel.");
+      setActionError(err.message || "Failed to disconnect channel.");
     } finally {
-      setDisconnecting(false);
+      setDisconnecting(null);
     }
   };
 
@@ -168,9 +215,6 @@ export default function SettingsPage() {
     );
   }
 
-  const isConnected = (profile?.connections.length ?? 0) > 0;
-  const channel = profile?.channels[0];
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -182,9 +226,42 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-1">
         <h1 className="font-playfair text-3xl font-bold text-primary">Creator Settings</h1>
         <p className="text-sm font-literata text-on-surface-variant">
-          Manage your personal details, connected channels, and developer credentials.
+          Manage your personal details and connected creator channels.
         </p>
       </div>
+
+      <AnimatePresence>
+        {flash && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center gap-2 font-literata text-xs shadow-sm"
+          >
+            <CheckCircle className="w-4 h-4" />
+            <span>{flash}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {actionError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl flex items-center justify-between font-literata text-xs shadow-sm"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              <span>{actionError}</span>
+            </div>
+            <button onClick={() => setActionError(null)} className="font-bold p-1 cursor-pointer">
+              Dismiss
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid lg:grid-cols-2 gap-8 items-start">
         {/* Profile Card */}
@@ -210,6 +287,9 @@ export default function SettingsPage() {
               <div className="flex flex-col">
                 <span className="font-literata text-xs text-on-surface-variant">Account Email</span>
                 <span className="font-literata text-sm font-semibold text-primary">{profile?.email}</span>
+                <span className="font-literata text-[11px] text-on-surface-variant mt-1">
+                  Signed in with {profile?.auth_provider === "google" ? "Google" : profile?.auth_provider}
+                </span>
               </div>
             </div>
 
@@ -258,105 +338,132 @@ export default function SettingsPage() {
             <h2 className="font-playfair text-lg font-bold text-primary">Linked Creator Channels</h2>
           </div>
 
-          {isConnected && channel ? (
-            <div className="flex flex-col gap-5">
-              <div className="flex items-start gap-4 bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/10">
-                {channel.thumbnail_url ? (
-                  <img
-                    src={channel.thumbnail_url}
-                    alt={channel.title}
-                    className="w-14 h-14 rounded-full object-cover border border-outline-variant/10"
-                  />
-                ) : (
-                  <div className="w-14 h-14 rounded-full bg-[#0b3d2e]/10 flex items-center justify-center">
-                    <Video className="w-7 h-7 text-[#0b3d2e]" />
-                  </div>
-                )}
-                
-                <div className="flex flex-col flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-playfair text-base font-bold text-primary truncate">{channel.title}</h3>
-                    <span className="text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full border bg-emerald-100/50 text-emerald-950 border-emerald-200">
-                      YouTube Linked
-                    </span>
-                  </div>
-                  
-                  <p className="text-xs text-on-surface-variant font-literata truncate mt-1">
-                    {channel.description || "No channel description available."}
-                  </p>
-                  
-                  <div className="flex gap-4 mt-3 text-[11px] font-literata text-on-surface-variant font-medium">
-                    <div>
-                      Subscriber Count: <span className="font-bold text-primary">{formatNumber(channel.subscriber_count)}</span>
-                    </div>
-                    <div className="border-l border-outline-variant/30 pl-4">
-                      Total Uploads: <span className="font-bold text-primary">{channel.video_count}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          <div className="flex flex-col gap-5">
+            {PROVIDERS.map((provider) => {
+              const account = profile?.connections.find((c) => c.provider === provider.id);
+              const channel = profile?.channels.find((c) => c.platform === provider.id);
+              const isConfirming = confirmDisconnect === provider.id;
 
-              {/* Google token expiry info */}
-              <div className="flex flex-col gap-1 text-[11px] font-literata text-on-surface-variant bg-surface-container/30 p-4 rounded-xl border border-outline-variant/5">
-                <span className="font-semibold text-primary">OAuth Connection Information:</span>
-                <div>Provider: Google OAuth 2.0 API</div>
-                <div>Expires: {new Date(profile!.connections[0].token_expires_at).toLocaleString()}</div>
-              </div>
+              return (
+                <div
+                  key={provider.id}
+                  className="flex flex-col gap-4 bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/10"
+                >
+                  <div className="flex items-start gap-4">
+                    {channel?.thumbnail_url ? (
+                      <img
+                        src={channel.thumbnail_url}
+                        alt={channel.title}
+                        className="w-14 h-14 rounded-full object-cover border border-outline-variant/10"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-[#0b3d2e]/10 flex items-center justify-center">
+                        {provider.id === "youtube" ? (
+                          <Video className="w-7 h-7 text-[#0b3d2e]" />
+                        ) : (
+                          <Music2 className="w-7 h-7 text-[#0b3d2e]" />
+                        )}
+                      </div>
+                    )}
 
-              <div className="border-t border-outline-variant/10 pt-4 mt-2">
-                {!showConfirmDisconnect ? (
-                  <button
-                    onClick={() => setShowConfirmDisconnect(true)}
-                    className="px-5 py-2.5 rounded-full border border-red-200 text-red-700 text-xs font-semibold font-literata hover:bg-red-50 transition cursor-pointer"
-                  >
-                    Disconnect Google Account
-                  </button>
-                ) : (
-                  <div className="bg-red-50/50 border border-red-100 rounded-2xl p-4 flex flex-col gap-3">
-                    <div className="flex gap-2 text-red-900 text-xs font-literata">
-                      <AlertTriangle className="w-4 h-4 text-red-700 flex-shrink-0" />
-                      <p>
-                        Are you sure you want to disconnect? This deletes all synced YouTube channel metadata, videos, comments, and analyses immediately.
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-playfair text-base font-bold text-primary truncate">
+                          {channel?.title || `Connect ${provider.label}`}
+                        </h3>
+                        <span className={`text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full border ${provider.badgeClass}`}>
+                          {account ? `${provider.label} Linked` : "Not Linked"}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-on-surface-variant font-literata truncate mt-1">
+                        {channel?.description || provider.description}
                       </p>
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={handleDisconnect}
-                        disabled={disconnecting}
-                        className="px-4 py-2 rounded-full bg-red-700 text-white text-xs font-semibold font-literata hover:bg-red-800 transition cursor-pointer"
-                      >
-                        {disconnecting ? "Disconnecting..." : "Yes, Disconnect"}
-                      </button>
-                      <button
-                        onClick={() => setShowConfirmDisconnect(false)}
-                        className="px-4 py-2 rounded-full border border-outline-variant/20 text-on-surface-variant text-xs font-semibold font-literata hover:bg-surface-container transition cursor-pointer"
-                      >
-                        Cancel
-                      </button>
+
+                      {channel && (
+                        <div className="flex gap-4 mt-3 text-[11px] font-literata text-on-surface-variant font-medium">
+                          <div>
+                            Followers:{" "}
+                            <span className="font-bold text-primary">
+                              {formatNumber(channel.subscriber_count)}
+                            </span>
+                          </div>
+                          <div className="border-l border-outline-variant/30 pl-4">
+                            Total Uploads:{" "}
+                            <span className="font-bold text-primary">{channel.video_count}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-4 py-8 text-center">
-              <div className="w-12 h-12 rounded-full bg-[#0b3d2e]/10 flex items-center justify-center">
-                <Video className="w-6 h-6 text-[#0b3d2e]" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <h3 className="font-playfair text-base font-bold text-primary">No accounts connected</h3>
-                <p className="text-xs text-on-surface-variant font-literata max-w-sm leading-relaxed">
-                  Connect your Google account to authorize YouTube read-only access.
-                </p>
-              </div>
-              <Link
-                href="/dashboard/videos"
-                className="px-6 py-2.5 rounded-full bg-primary hover:bg-primary-container text-on-primary text-xs font-semibold font-literata transition shadow-sm"
-              >
-                Go Link YouTube Channel
-              </Link>
-            </div>
-          )}
+
+                  {account ? (
+                    <div className="flex flex-col gap-3 border-t border-outline-variant/10 pt-4">
+                      {!isConfirming ? (
+                        <div className="flex flex-wrap items-center gap-3">
+                          <button
+                            onClick={() => handleConnect(provider.id)}
+                            disabled={connecting === provider.id}
+                            title="Re-run consent to refresh permissions, then re-sync"
+                            className="px-5 py-2.5 rounded-full bg-primary hover:bg-primary-container text-on-primary text-xs font-semibold font-literata transition cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {connecting === provider.id && (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            )}
+                            {connecting === provider.id ? "Redirecting..." : "Reconnect"}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDisconnect(provider.id)}
+                            className="px-5 py-2.5 rounded-full border border-red-200 text-red-700 text-xs font-semibold font-literata hover:bg-red-50 transition cursor-pointer"
+                          >
+                            Disconnect {provider.label}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="bg-red-50/50 border border-red-100 rounded-2xl p-4 flex flex-col gap-3">
+                          <div className="flex gap-2 text-red-900 text-xs font-literata">
+                            <AlertTriangle className="w-4 h-4 text-red-700 flex-shrink-0" />
+                            <p>
+                              Disconnecting removes all synced {provider.label} channels, videos,
+                              comments, and analyses. This cannot be undone.
+                            </p>
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => handleDisconnect(provider.id)}
+                              disabled={disconnecting === provider.id}
+                              className="px-4 py-2 rounded-full bg-red-700 text-white text-xs font-semibold font-literata hover:bg-red-800 transition cursor-pointer disabled:opacity-50"
+                            >
+                              {disconnecting === provider.id ? "Disconnecting..." : "Yes, Disconnect"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDisconnect(null)}
+                              className="px-4 py-2 rounded-full border border-outline-variant/20 text-on-surface-variant text-xs font-semibold font-literata hover:bg-surface-container transition cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="border-t border-outline-variant/10 pt-4">
+                      <button
+                        onClick={() => handleConnect(provider.id)}
+                        disabled={connecting === provider.id}
+                        className="px-6 py-2.5 rounded-full bg-primary hover:bg-primary-container text-on-primary text-xs font-semibold font-literata transition shadow-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                      >
+                        {connecting === provider.id && (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        )}
+                        {connecting === provider.id ? "Redirecting..." : `Connect ${provider.label}`}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </motion.div>

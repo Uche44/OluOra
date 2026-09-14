@@ -1,17 +1,24 @@
 import uuid
 import logging
 from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import providers
+from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import create_access_token, create_refresh_token
+from app.dependencies.auth import get_current_user
 from app.modules.users.models import User, SocialAccount
 from app.modules.users.schemas import UserResponse
 from app.modules.users import token_service
-from app.integrations import google
+from app.modules.users.social_tokens import get_social_account
+from app.integrations import google, tiktok
+from app.integrations.oauth_state import create_oauth_state, verify_oauth_state
 
 logger = logging.getLogger(__name__)
 
@@ -38,22 +45,85 @@ class RefreshTokenResponse(BaseModel):
 class LogoutRequest(BaseModel):
     refresh_token: str
 
-@router.get("/google/url", summary="Get Google OAuth authorization URL")
-async def get_google_url():
-    """Returns the authorization redirect URI for initiating YouTube Sign-In.
 
-    Also returns a signed, expiring `state` token that the client must store and
-    echo back to the callback endpoint to guard against login CSRF.
+async def _issue_session(db: AsyncSession, user: User) -> dict:
+    """Create OluOra JWTs and persist the refresh token server-side for rotation/revocation."""
+    jwt_access = create_access_token({"sub": str(user.id)})
+    refresh_jti = str(uuid.uuid4())
+    jwt_refresh = create_refresh_token({"sub": str(user.id)}, jti=refresh_jti)
+    await token_service.issue_refresh_token(db, user.id, jwt_refresh, refresh_jti)
+    return {"access_token": jwt_access, "refresh_token": jwt_refresh, "user": user}
+
+
+async def _upsert_connection(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    provider: str,
+    provider_user_id: str,
+    access_token: str,
+    refresh_token: str | None,
+    expires_in: int,
+    refresh_expires_in: int | None = None,
+) -> SocialAccount:
+    """Create or update the user's connection for a data provider."""
+    now = datetime.now(timezone.utc)
+    social = await get_social_account(db, user_id, provider)
+    if social is None:
+        social = SocialAccount(
+            user_id=user_id,
+            provider=provider,
+            provider_user_id=provider_user_id,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_expires_at=now + timedelta(seconds=expires_in),
+            refresh_token_expires_at=(
+                now + timedelta(seconds=refresh_expires_in) if refresh_expires_in else None
+            ),
+        )
+    else:
+        social.provider_user_id = provider_user_id
+        social.access_token = access_token
+        if refresh_token:
+            social.refresh_token = refresh_token
+        social.token_expires_at = now + timedelta(seconds=expires_in)
+        if refresh_expires_in:
+            social.refresh_token_expires_at = now + timedelta(seconds=refresh_expires_in)
+    db.add(social)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "ACCOUNT_ALREADY_CONNECTED",
+                "message": f"This {provider} account is already linked to another OluOra account.",
+            },
+        )
+    await db.refresh(social)
+    return social
+
+
+# ---------------------------------------------------------------------------
+# Google login (identity only)
+# ---------------------------------------------------------------------------
+
+@router.get("/google/url", summary="Get Google sign-in URL")
+async def get_google_url():
+    """Returns the Google consent URL and a signed state token.
+
+    The login flow requests identity scopes only; connecting YouTube is a
+    separate consent handled by ``/auth/youtube/url``.
     """
-    state = google.create_oauth_state()
-    url = google.get_google_auth_url(state=state)
+    state = create_oauth_state(providers.FLOW_LOGIN)
+    url = google.get_google_auth_url(state=state, scopes=google.LOGIN_SCOPES)
     return {"url": url, "state": state}
 
-@router.post("/google/callback", response_model=TokenResponse, summary="Process Google OAuth callback code")
+@router.post("/google/callback", response_model=TokenResponse, summary="Process Google sign-in callback")
 async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depends(get_db)):
-    """Processes the callback code, exchanges it for tokens, syncs user records, and issues JWTs."""
+    """Processes the callback code, upserts the user account, and issues OluOra JWTs."""
     # 0. Verify the OAuth state token to prevent login CSRF (forged/reused flows).
-    if not google.verify_oauth_state(payload.state):
+    if not verify_oauth_state(payload.state, providers.FLOW_LOGIN):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired OAuth state. Please start the sign-in flow again.",
@@ -68,17 +138,14 @@ async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depend
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Google token exchange failed. Please try again.",
         )
-    
+
     access_token = tokens.get("access_token")
-    refresh_token = tokens.get("refresh_token")
-    expires_in = tokens.get("expires_in", 3600)
-    
     if not access_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to retrieve access token from Google"
         )
-        
+
     # 2. Retrieve user profile info from Google
     try:
         profile = await google.get_google_user_profile(access_token)
@@ -88,82 +155,205 @@ async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depend
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to retrieve your Google profile. Please try again.",
         )
-        
+
     email = profile.get("email")
     google_id = profile.get("sub")
     name = profile.get("name")
     picture = profile.get("picture")
-    
+
     if not email or not google_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Google profile is missing email or user ID"
         )
 
-    # 3. Create or update User record
+    # 3. Create or update User record (identity lives on the user, not a social account)
     user_query = select(User).where(User.email == email)
     result = await db.execute(user_query)
     user = result.scalar_one_or_none()
-    
-    token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
     if not user:
-        # Create new User
         user = User(
             email=email,
             full_name=name,
             profile_picture=picture,
-            is_active=True
+            is_active=True,
+            auth_provider=providers.GOOGLE,
+            auth_provider_id=google_id,
         )
         db.add(user)
         await db.commit()
         await db.refresh(user)
         logger.info(f"Created new user account: {email}")
     else:
-        # Update existing User profile
         user.full_name = name
         user.profile_picture = picture
+        user.auth_provider = providers.GOOGLE
+        user.auth_provider_id = google_id
         db.add(user)
         await db.commit()
         await db.refresh(user)
 
-    # 4. Create or update Google SocialAccount details
-    social_query = select(SocialAccount).where(SocialAccount.user_id == user.id)
-    social_result = await db.execute(social_query)
-    social = social_result.scalar_one_or_none()
-    
-    if not social:
-        social = SocialAccount(
-            user_id=user.id,
-            provider="google",
-            provider_user_id=google_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_expires_at=token_expires_at
-        )
-        db.add(social)
-    else:
-        social.access_token = access_token
-        # Google only returns refresh_token on initial consent. Keep the old one if none is returned.
-        if refresh_token:
-            social.refresh_token = refresh_token
-        social.token_expires_at = token_expires_at
-        db.add(social)
-        
-    await db.commit()
+    return await _issue_session(db, user)
 
-    # 5. Generate OluOra JWT session tokens and persist the refresh token
-    #    server-side so it can be rotated and revoked.
-    jwt_access = create_access_token({"sub": str(user.id)})
-    refresh_jti = str(uuid.uuid4())
-    jwt_refresh = create_refresh_token({"sub": str(user.id)}, jti=refresh_jti)
-    await token_service.issue_refresh_token(db, user.id, jwt_refresh, refresh_jti)
+
+# ---------------------------------------------------------------------------
+# YouTube connection (data provider)
+# ---------------------------------------------------------------------------
+
+@router.get("/youtube/url", summary="Get YouTube connection URL")
+async def get_youtube_url(current_user: User = Depends(get_current_user)):
+    """Returns the Google consent URL that grants read-only YouTube access."""
+    state = create_oauth_state(providers.FLOW_YOUTUBE_CONNECT, user_id=current_user.id)
+    url = google.get_google_auth_url(
+        state=state,
+        scopes=google.YOUTUBE_SCOPES,
+        redirect_uri=settings.GOOGLE_YOUTUBE_REDIRECT_URI,
+    )
+    return {"url": url, "state": state}
+
+@router.post("/youtube/callback", summary="Connect a YouTube channel")
+async def youtube_callback(
+    payload: GoogleLoginRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Exchanges the consent code, stores the YouTube connection, and imports the channel."""
+    state_payload = verify_oauth_state(payload.state, providers.FLOW_YOUTUBE_CONNECT)
+    if not state_payload or state_payload.get("sub") != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OAuth state. Please start the connection flow again.",
+        )
+
+    try:
+        tokens = await google.exchange_code_for_tokens(
+            payload.code, redirect_uri=settings.GOOGLE_YOUTUBE_REDIRECT_URI
+        )
+        profile = await google.get_google_user_profile(tokens.get("access_token"))
+    except Exception:
+        logger.exception("YouTube connection token exchange failed")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to connect your YouTube account. Please try again.",
+        )
+
+    google_id = profile.get("sub")
+    if not google_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google profile is missing a user ID",
+        )
+
+    await _upsert_connection(
+        db,
+        user_id=current_user.id,
+        provider=providers.YOUTUBE,
+        provider_user_id=google_id,
+        access_token=tokens.get("access_token"),
+        refresh_token=tokens.get("refresh_token"),
+        expires_in=tokens.get("expires_in", 3600),
+    )
+
+    # Import the channel right away so the connection is immediately useful.
+    videos_imported = 0
+    sync_error = None
+    try:
+        from app.modules.youtube.services import sync_youtube_data
+        videos_imported = await sync_youtube_data(db, current_user)
+    except Exception as e:
+        logger.exception("Initial YouTube sync failed")
+        sync_error = str(e)
 
     return {
-        "access_token": jwt_access,
-        "refresh_token": jwt_refresh,
-        "user": user
+        "success": True,
+        "provider": providers.YOUTUBE,
+        "videos_imported": videos_imported,
+        "warning": sync_error,
     }
+
+
+# ---------------------------------------------------------------------------
+# TikTok connection (data provider)
+# ---------------------------------------------------------------------------
+
+@router.get("/tiktok/url", summary="Get TikTok connection URL")
+async def get_tiktok_url(current_user: User = Depends(get_current_user)):
+    """Returns the TikTok consent URL for connecting a creator's TikTok account."""
+    if not settings.TIKTOK_CLIENT_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "PROVIDER_NOT_CONFIGURED",
+                "message": "TikTok integration is not configured on this server.",
+            },
+        )
+    state = create_oauth_state(providers.FLOW_TIKTOK_CONNECT, user_id=current_user.id)
+    url = tiktok.get_tiktok_auth_url(state=state)
+    return {"url": url, "state": state}
+
+@router.post("/tiktok/callback", summary="Connect a TikTok account")
+async def tiktok_callback(
+    payload: GoogleLoginRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Exchanges the consent code, stores the TikTok connection, and imports the video catalog."""
+    state_payload = verify_oauth_state(payload.state, providers.FLOW_TIKTOK_CONNECT)
+    if not state_payload or state_payload.get("sub") != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OAuth state. Please start the connection flow again.",
+        )
+
+    try:
+        tokens = await tiktok.exchange_code_for_tokens(payload.code)
+        user_info = await tiktok.fetch_user_info(tokens["access_token"])
+    except Exception:
+        logger.exception("TikTok connection token exchange failed")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to connect your TikTok account. Please try again.",
+        )
+
+    open_id = tokens.get("open_id") or user_info.get("open_id")
+    if not open_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="TikTok did not return an account identifier",
+        )
+
+    await _upsert_connection(
+        db,
+        user_id=current_user.id,
+        provider=providers.TIKTOK,
+        provider_user_id=open_id,
+        access_token=tokens["access_token"],
+        refresh_token=tokens.get("refresh_token"),
+        expires_in=tokens.get("expires_in", 86400),
+        refresh_expires_in=tokens.get("refresh_expires_in"),
+    )
+
+    videos_imported = 0
+    sync_error = None
+    try:
+        from app.modules.tiktok.services import sync_tiktok_data
+        videos_imported = await sync_tiktok_data(db, current_user)
+    except Exception as e:
+        logger.exception("Initial TikTok sync failed")
+        sync_error = str(e)
+
+    return {
+        "success": True,
+        "provider": providers.TIKTOK,
+        "videos_imported": videos_imported,
+        "warning": sync_error,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Session management
+# ---------------------------------------------------------------------------
 
 @router.post("/refresh", response_model=RefreshTokenResponse, summary="Refresh OluOra JWT access token")
 async def refresh_access_token(payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):

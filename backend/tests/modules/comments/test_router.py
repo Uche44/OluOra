@@ -20,7 +20,7 @@ async def test_get_comments_list_success(client: AsyncClient, db: AsyncSession):
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_router",
+        external_id="UC_router",
         title="Router Channel",
         subscriber_count=200,
         video_count=1
@@ -31,7 +31,7 @@ async def test_get_comments_list_success(client: AsyncClient, db: AsyncSession):
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-router",
+        external_id="video-router",
         title="Testing Router Comments",
         published_at=datetime.now(timezone.utc),
         sync_status="completed"
@@ -44,7 +44,7 @@ async def test_get_comments_list_success(client: AsyncClient, db: AsyncSession):
     for i in range(5):
         comment = Comment(
             video_id=video.id,
-            youtube_comment_id=f"comment-id-{i}",
+            external_id=f"comment-id-{i}",
             author_name=f"Commenter {i}",
             text=f"This is comment {i}",
             like_count=i,
@@ -91,7 +91,7 @@ async def test_get_comments_list_not_found(client: AsyncClient, db: AsyncSession
     assert data["detail"]["code"] == "VIDEO_NOT_FOUND"
 
 
-@patch("app.modules.comments.router.get_or_refresh_google_token", new_callable=AsyncMock)
+@patch("app.modules.comments.router.get_or_refresh_social_token", new_callable=AsyncMock)
 @patch("app.modules.comments.router.sync_comments_for_video", new_callable=AsyncMock)
 async def test_sync_comments_endpoint_success(mock_sync, mock_refresh, client: AsyncClient, db: AsyncSession):
     # 1. Setup user, channel, video, and social connection
@@ -102,7 +102,7 @@ async def test_sync_comments_endpoint_success(mock_sync, mock_refresh, client: A
 
     social = SocialAccount(
         user_id=user.id,
-        provider="google",
+        provider="youtube",
         provider_user_id="google-sync-router",
         access_token="valid-token",
         refresh_token="valid-refresh",
@@ -112,7 +112,7 @@ async def test_sync_comments_endpoint_success(mock_sync, mock_refresh, client: A
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_sync_router",
+        external_id="UC_sync_router",
         title="Sync Router Channel",
         subscriber_count=200,
         video_count=1
@@ -123,7 +123,7 @@ async def test_sync_comments_endpoint_success(mock_sync, mock_refresh, client: A
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-sync-router",
+        external_id="video-sync-router",
         title="Testing Router Comments Sync",
         published_at=datetime.now(timezone.utc),
         sync_status="pending"
@@ -164,7 +164,7 @@ async def test_sync_comments_endpoint_no_connected_account(client: AsyncClient, 
 
     channel = Channel(
         creator_id=user.id,
-        youtube_channel_id="UC_sync_no_acc",
+        external_id="UC_sync_no_acc",
         title="No Acc Channel",
         subscriber_count=20,
         video_count=1
@@ -175,7 +175,7 @@ async def test_sync_comments_endpoint_no_connected_account(client: AsyncClient, 
 
     video = Video(
         channel_id=channel.id,
-        youtube_video_id="video-sync-no-acc",
+        external_id="video-sync-no-acc",
         title="Testing Sync No Acc",
         published_at=datetime.now(timezone.utc),
         sync_status="pending"

@@ -3,7 +3,8 @@ from datetime import datetime
 from pydantic import BaseModel, HttpUrl, ConfigDict
 
 class ChannelBase(BaseModel):
-    youtube_channel_id: str
+    platform: str = "youtube"
+    external_id: str
     title: str
     description: str | None = None
     thumbnail_url: str | None = None
@@ -22,7 +23,8 @@ class ChannelResponse(ChannelBase):
     model_config = ConfigDict(from_attributes=True)
 
 class VideoBase(BaseModel):
-    youtube_video_id: str
+    platform: str = "youtube"
+    external_id: str
     title: str
     description: str | None = None
     thumbnail_url: str | None = None

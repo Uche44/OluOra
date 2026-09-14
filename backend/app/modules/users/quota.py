@@ -42,8 +42,8 @@ async def verify_quota_limit(db: AsyncSession, user_id: uuid.UUID, planned_cost:
     if used + planned_cost > limit:
         raise ValueError("QUOTA_EXCEEDED")
 
-async def log_youtube_quota(db: AsyncSession, user_id: uuid.UUID, endpoint: str, units: int) -> None:
-    """Records a YouTube API call and its unit cost to the quota usage log."""
+async def log_api_quota(db: AsyncSession, user_id: uuid.UUID, endpoint: str, units: int) -> None:
+    """Records an external API call and its unit cost to the quota usage log."""
     usage = ApiQuotaUsage(
         user_id=user_id,
         endpoint=endpoint,

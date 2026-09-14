@@ -1,5 +1,25 @@
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+export type DataProvider = "youtube" | "tiktok";
+
+/** Begin a data-provider connection: fetch the consent URL, store the state, and redirect. */
+export async function startConnectFlow(provider: DataProvider): Promise<void> {
+  const res = await authedFetch(`${apiUrl}/api/v1/auth/${provider}/url`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const detail = err?.detail;
+    throw new Error(
+      (typeof detail === "string" ? detail : detail?.message) ||
+        `Could not start the ${provider} connection.`,
+    );
+  }
+  const data = await res.json();
+  if (data.state) {
+    sessionStorage.setItem(`${provider}_oauth_state`, data.state);
+  }
+  window.location.href = data.url;
+}
+
 export async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = localStorage.getItem("refresh_token");
   if (!refreshToken) return null;

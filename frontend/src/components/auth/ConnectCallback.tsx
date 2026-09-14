@@ -1,0 +1,113 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ShieldAlert, Sparkles } from "lucide-react";
+import { authedFetch } from "@/lib/api";
+import type { DataProvider } from "@/lib/api";
+
+interface ConnectCallbackProps {
+  provider: DataProvider;
+}
+
+export default function ConnectCallback({ provider }: ConnectCallbackProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState(`Connecting your ${provider} account...`);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const code = searchParams.get("code");
+    if (!code) {
+      setError("Authorization code is missing from the redirect URL.");
+      return;
+    }
+
+    // Validate the state echoed by the provider against the one saved when the
+    // connection flow was started from this browser tab (CSRF guard).
+    const state = searchParams.get("state");
+    const storedState = sessionStorage.getItem(`${provider}_oauth_state`);
+    if (!state || !storedState || state !== storedState) {
+      setError("Invalid or missing OAuth state. Please start the connection again.");
+      return;
+    }
+    sessionStorage.removeItem(`${provider}_oauth_state`);
+
+    const exchange = async () => {
+      try {
+        setStatus("Gathering your channel data...");
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await authedFetch(`${apiUrl}/api/v1/auth/${provider}/callback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, state }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const detail = data?.detail;
+          throw new Error(
+            (typeof detail === "string" ? detail : detail?.message) ||
+              `Failed to connect your ${provider} account.`,
+          );
+        }
+
+        setStatus("Connection complete!");
+        sessionStorage.setItem(
+          "connect_flash",
+          `${provider === "tiktok" ? "TikTok" : "YouTube"} connected successfully.`,
+        );
+        setTimeout(() => router.push("/dashboard/settings"), 800);
+      } catch (err: any) {
+        setError(err.message || `Failed to connect your ${provider} account.`);
+      }
+    };
+
+    exchange();
+  }, [provider, searchParams, router]);
+
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md bg-white border border-error-container rounded-3xl p-8 shadow-xl text-center flex flex-col items-center gap-6"
+      >
+        <div className="w-16 h-16 rounded-full bg-error-container/20 flex items-center justify-center text-error">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <h2 className="font-playfair text-2xl font-bold text-primary">Connection Failed</h2>
+          <p className="text-sm text-on-surface-variant font-literata leading-relaxed">{error}</p>
+        </div>
+        <Link
+          href="/dashboard/settings"
+          className="w-full py-3 bg-primary text-on-primary font-literata text-sm font-medium rounded-full hover:bg-primary-container transition-colors duration-150"
+        >
+          Back to Settings
+        </Link>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-md bg-white border border-outline-variant/20 rounded-3xl p-8 shadow-xl text-center flex flex-col items-center gap-6"
+    >
+      <div className="relative w-16 h-16 flex items-center justify-center">
+        <div className="absolute inset-0 rounded-full border-4 border-primary-container/10 border-t-primary animate-spin" />
+      </div>
+      <div className="flex flex-col gap-2">
+        <h3 className="font-playfair text-xl font-bold text-primary">Connecting account</h3>
+        <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant font-literata">
+          <Sparkles className="w-4 h-4 text-secondary-container" />
+          <span>{status}</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+}

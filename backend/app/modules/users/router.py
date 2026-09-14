@@ -3,8 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import providers
 from app.core.db import get_db
 from app.dependencies.auth import get_current_user
+from app.integrations import tiktok
 from app.modules.users.models import User, SocialAccount
 from app.modules.users.schemas import (
     UserUpdate, 
@@ -22,23 +24,21 @@ from app.modules.analysis.models import Analysis, Insight, TopicCluster
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-
-@router.get("/me", response_model=UserProfileResponse)
-async def get_me(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Retrieves current user details, connected social accounts, and connected channels."""
-    # Fetch user's social accounts
-    social_query = select(SocialAccount).where(SocialAccount.user_id == current_user.id)
-    social_result = await db.execute(social_query)
+async def _load_profile_parts(db: AsyncSession, user_id):
+    """Load a user's connected data accounts and channels."""
+    social_result = await db.execute(
+        select(SocialAccount).where(SocialAccount.user_id == user_id)
+    )
     socials = social_result.scalars().all()
 
-    # Fetch user's connected channels
-    channel_query = select(Channel).where(Channel.creator_id == current_user.id)
-    channel_result = await db.execute(channel_query)
+    channel_result = await db.execute(
+        select(Channel).where(Channel.creator_id == user_id)
+    )
     channels = channel_result.scalars().all()
+    return socials, channels
 
+
+def _serialize_profile(user: User, socials, channels) -> UserProfileResponse:
     connections = [
         ConnectedAccountSchema(
             provider=s.provider,
@@ -50,7 +50,8 @@ async def get_me(
     channels_data = [
         ConnectedChannelSchema(
             id=c.id,
-            youtube_channel_id=c.youtube_channel_id,
+            platform=c.platform,
+            external_id=c.external_id,
             title=c.title,
             description=c.description,
             thumbnail_url=c.thumbnail_url,
@@ -60,15 +61,26 @@ async def get_me(
     ]
 
     return UserProfileResponse(
-        id=current_user.id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        profile_picture=current_user.profile_picture,
-        is_active=current_user.is_active,
-        created_at=current_user.created_at,
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        profile_picture=user.profile_picture,
+        is_active=user.is_active,
+        auth_provider=user.auth_provider,
+        created_at=user.created_at,
         connections=connections,
         channels=channels_data
     )
+
+
+@router.get("/me", response_model=UserProfileResponse)
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Retrieves current user details, connected data accounts, and connected channels."""
+    socials, channels = await _load_profile_parts(db, current_user.id)
+    return _serialize_profile(current_user, socials, channels)
 
 
 @router.put("/me", response_model=UserProfileResponse)
@@ -87,45 +99,8 @@ async def update_me(
     await db.commit()
     await db.refresh(current_user)
 
-    # Fetch updated connections and channels
-    social_query = select(SocialAccount).where(SocialAccount.user_id == current_user.id)
-    social_result = await db.execute(social_query)
-    socials = social_result.scalars().all()
-
-    channel_query = select(Channel).where(Channel.creator_id == current_user.id)
-    channel_result = await db.execute(channel_query)
-    channels = channel_result.scalars().all()
-
-    connections = [
-        ConnectedAccountSchema(
-            provider=s.provider,
-            provider_user_id=s.provider_user_id,
-            token_expires_at=s.token_expires_at
-        ) for s in socials
-    ]
-
-    channels_data = [
-        ConnectedChannelSchema(
-            id=c.id,
-            youtube_channel_id=c.youtube_channel_id,
-            title=c.title,
-            description=c.description,
-            thumbnail_url=c.thumbnail_url,
-            subscriber_count=c.subscriber_count,
-            video_count=c.video_count
-        ) for c in channels
-    ]
-
-    return UserProfileResponse(
-        id=current_user.id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        profile_picture=current_user.profile_picture,
-        is_active=current_user.is_active,
-        created_at=current_user.created_at,
-        connections=connections,
-        channels=channels_data
-    )
+    socials, channels = await _load_profile_parts(db, current_user.id)
+    return _serialize_profile(current_user, socials, channels)
 
 
 @router.post("/disconnect/{provider}")
@@ -134,7 +109,7 @@ async def disconnect_provider(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Disconnects a social provider, deleting associated social credentials and connected channels."""
+    """Disconnects a data provider, removing only that platform's channels and credentials."""
     # Find social account
     social_query = select(SocialAccount).where(
         SocialAccount.user_id == current_user.id,
@@ -152,16 +127,21 @@ async def disconnect_provider(
             }
         )
 
-    # Delete social account
-    await db.delete(social)
+    # Best-effort provider-side revocation before dropping local credentials.
+    if provider == providers.TIKTOK:
+        await tiktok.revoke_access_token(social.access_token)
 
-    # Delete channels linked to this user (which will cascade-delete videos, comments, analyses)
-    channel_query = select(Channel).where(Channel.creator_id == current_user.id)
+    # Delete only this platform's channels (cascade-deletes their videos/comments/analyses)
+    channel_query = select(Channel).where(
+        Channel.creator_id == current_user.id,
+        Channel.platform == provider
+    )
     channel_result = await db.execute(channel_query)
     channels = channel_result.scalars().all()
     for channel in channels:
         await db.delete(channel)
 
+    await db.delete(social)
     await db.commit()
 
     return {

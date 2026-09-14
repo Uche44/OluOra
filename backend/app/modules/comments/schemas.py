@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 class CommentBase(BaseModel):
-    youtube_comment_id: str
+    external_id: str
     author_name: str
     author_profile_image: str | None = None
     text: str

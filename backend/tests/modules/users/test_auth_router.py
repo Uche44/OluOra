@@ -5,8 +5,9 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.users.models import User, SocialAccount, RefreshToken
+from app.core import providers
 from app.core.security import create_refresh_token, decode_token
-from app.integrations import google as google_integration
+from app.integrations.oauth_state import create_oauth_state
 from app.modules.users import token_service
 
 pytestmark = pytest.mark.asyncio
@@ -18,13 +19,15 @@ async def test_get_google_url(client: AsyncClient):
     assert "url" in data
     assert "accounts.google.com" in data["url"]
     assert "scope=" in data["url"]
-    assert "youtube.readonly" in data["url"]
+    # Login is identity-only: YouTube access is a separate consent flow.
+    assert "userinfo.email" in data["url"]
+    assert "youtube.readonly" not in data["url"]
     assert "state=" in data["url"]
     assert data["state"]
 
 async def test_google_callback_rejects_missing_state(client: AsyncClient):
-    # A callback with no/invalid OAuth state must be rejected (login CSRF guard).
-    payload = {"code": "google-auth-code-xyz"}
+    # An empty OAuth state must be rejected by the CSRF guard (not just schema-validated away).
+    payload = {"code": "google-auth-code-xyz", "state": ""}
     response = await client.post("/api/v1/auth/google/callback", json=payload)
     assert response.status_code == 400
 
@@ -56,7 +59,7 @@ async def test_google_callback_new_user(
     }
 
     # Execute request
-    state = google_integration.create_oauth_state()
+    state = create_oauth_state(providers.FLOW_LOGIN)
     payload = {"code": "google-auth-code-xyz", "state": state}
     response = await client.post("/api/v1/auth/google/callback", json=payload)
     
@@ -75,15 +78,14 @@ async def test_google_callback_new_user(
     assert user is not None
     assert user.full_name == "Olu Creator Test"
 
-    # Verify social account was created in the database
+    # Identity lives on the user, not on a data-provider connection.
+    assert user.auth_provider == "google"
+    assert user.auth_provider_id == "google-id-unique-789"
+
+    # Login must NOT create a YouTube/TikTok connection.
     social_query = select(SocialAccount).where(SocialAccount.user_id == user.id)
     social_result = await db.execute(social_query)
-    social = social_result.scalar_one_or_none()
-    assert social is not None
-    assert social.provider == "google"
-    assert social.provider_user_id == "google-id-unique-789"
-    assert social.access_token == "google-access-token-123"
-    assert social.refresh_token == "google-refresh-token-123"
+    assert social_result.scalar_one_or_none() is None
 
 @patch("app.integrations.google.exchange_code_for_tokens", new_callable=AsyncMock)
 @patch("app.integrations.google.get_google_user_profile", new_callable=AsyncMock)
@@ -106,7 +108,7 @@ async def test_google_callback_existing_user(
 
     social = SocialAccount(
         user_id=user.id,
-        provider="google",
+        provider="youtube",
         provider_user_id="google-id-existing-999",
         access_token="old-google-access",
         refresh_token="old-google-refresh",
@@ -129,7 +131,7 @@ async def test_google_callback_existing_user(
     }
 
     # Execute callback request
-    state = google_integration.create_oauth_state()
+    state = create_oauth_state(providers.FLOW_LOGIN)
     payload = {"code": "existing-auth-code", "state": state}
     response = await client.post("/api/v1/auth/google/callback", json=payload)
     
@@ -141,11 +143,13 @@ async def test_google_callback_existing_user(
     await db.refresh(user)
     assert user.full_name == "New Name Update"
     assert user.profile_picture == "https://new-avatar.jpg"
+    assert user.auth_provider == "google"
+    assert user.auth_provider_id == "google-id-existing-999"
 
-    # Verify DB social account tokens were updated
+    # The existing YouTube connection must be left untouched by the login flow.
     await db.refresh(social)
-    assert social.access_token == "new-google-access-token"
-    assert social.refresh_token == "new-google-refresh-token"
+    assert social.access_token == "old-google-access"
+    assert social.refresh_token == "old-google-refresh"
 
 async def test_refresh_token_success(client: AsyncClient, db: AsyncSession):
     # 1. Create a user
