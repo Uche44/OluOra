@@ -45,6 +45,9 @@ class Video(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Canonical public URL. Required to enrich a video through third-party
+    # providers (e.g. TikTok comments are fetched by URL).
+    url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     view_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     like_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

@@ -58,7 +58,7 @@ const PROVIDERS: {
     id: "tiktok",
     label: "TikTok",
     badgeClass: "bg-slate-900/5 text-slate-900 border-slate-300",
-    description: "Sync your public video catalog. Comment analysis is coming soon.",
+    description: "Sync your public video catalog and comments for AI analysis.",
   },
 ];
 

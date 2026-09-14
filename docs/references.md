@@ -16,8 +16,25 @@ OluOra now separates **login identity** from **data-provider connections**:
 |---|---|---|
 | OAuth connect/disconnect | ✅ | ✅ (Login Kit) |
 | Channel + video catalog sync | ✅ | ✅ (`Display API /v2/video/list/`) |
-| Comment ingestion | ✅ | ❌ No endpoint for standard apps |
-| AI comment analysis | ✅ | ❌ (UI shows "coming soon") |
+| Comment ingestion | ✅ (`commentThreads.list`) | ✅ (ScrapeCreators, top-level only) |
+| AI comment analysis | ✅ | ✅ (requires `SCRAPECREATORS_API_KEY`) |
+
+### TikTok comments — how they are sourced
+
+TikTok's Display API exposes **no comment-read endpoint** to commercial apps, and the
+Research API is restricted to non-commercial academic use. OluOra therefore ingests
+public TikTok comments through **ScrapeCreators** (`app/integrations/scrapecreators.py`).
+
+- Endpoint: `GET /v1/tiktok/video/comments` — **billed per request (1 credit)**, and each
+  request returns one page (~20) of top-level comments.
+- **Only top-level comments are ingested.** Replies live behind a separate endpoint
+  (`/v1/tiktok/video/comment/replies`) and are deliberately out of scope.
+- Videos store TikTok's `share_url` (column `videos.url`) because the provider addresses a
+  video by URL. Videos imported before this column existed must be re-synced; otherwise
+  comment sync returns `VIDEO_URL_MISSING`.
+- Quota accounting charges **1 unit per page**, matching the YouTube path (1 request = 1 unit).
+- Leaving `SCRAPECREATORS_API_KEY` empty disables TikTok comment analysis and the API
+  returns `COMMENTS_NOT_SUPPORTED` for TikTok videos.
 
 ### TikTok specifics to remember
 
@@ -40,6 +57,7 @@ GOOGLE_YOUTUBE_REDIRECT_URI=http://localhost:3000/auth/youtube/callback
 TIKTOK_CLIENT_KEY=...
 TIKTOK_CLIENT_SECRET=...
 TIKTOK_REDIRECT_URI=https://<tunnel-domain>/auth/tiktok/callback
+SCRAPECREATORS_API_KEY=...   # empty disables TikTok comment analysis
 ```
 
 ---

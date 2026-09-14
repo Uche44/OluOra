@@ -19,6 +19,15 @@ export default function ConnectCallback({ provider }: ConnectCallbackProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Providers report refusals on the redirect itself (TikTok documents
+    // `error`/`error_description`), so surface those before anything else.
+    const providerError = searchParams.get("error");
+    if (providerError) {
+      const description = searchParams.get("error_description");
+      setError(description || `Authorization was refused (${providerError}).`);
+      return;
+    }
+
     const code = searchParams.get("code");
     if (!code) {
       setError("Authorization code is missing from the redirect URL.");
@@ -26,14 +35,24 @@ export default function ConnectCallback({ provider }: ConnectCallbackProps) {
     }
 
     // Validate the state echoed by the provider against the one saved when the
-    // connection flow was started from this browser tab (CSRF guard).
+    // connection flow was started from this browser tab (CSRF guard). Storage is
+    // partitioned per origin, so during tunnel-based dev the flow can start on
+    // localhost and finish on the tunnel origin with nothing stored there. When
+    // no stored state exists, defer to the backend, which verifies the signed
+    // state and binds it to the authenticated user.
     const state = searchParams.get("state");
-    const storedState = sessionStorage.getItem(`${provider}_oauth_state`);
-    if (!state || !storedState || state !== storedState) {
-      setError("Invalid or missing OAuth state. Please start the connection again.");
+    if (!state) {
+      setError("Missing OAuth state. Please start the connection again.");
       return;
     }
-    sessionStorage.removeItem(`${provider}_oauth_state`);
+    const storedState = sessionStorage.getItem(`${provider}_oauth_state`);
+    if (storedState && state !== storedState) {
+      setError("Invalid OAuth state. Please start the connection again.");
+      return;
+    }
+    if (storedState) {
+      sessionStorage.removeItem(`${provider}_oauth_state`);
+    }
 
     const exchange = async () => {
       try {

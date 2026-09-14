@@ -516,14 +516,6 @@ export default function VideosPage() {
                       >
                         View Insights
                       </Link>
-                    ) : video.platform !== "youtube" ? (
-                      <button
-                        disabled
-                        title="TikTok does not expose a comment API for standard apps."
-                        className="w-full bg-surface-container-low text-on-surface-variant/60 font-literata text-xs font-semibold py-2.5 rounded-xl border border-outline-variant/10 text-center cursor-not-allowed"
-                      >
-                        Comment analysis coming soon
-                      </button>
                     ) : video.sync_status === "disabled" ? (
                       <button 
                         disabled 

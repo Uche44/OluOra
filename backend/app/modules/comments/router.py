@@ -3,13 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.core import providers
+from app.core.capabilities import comment_analysis_supported
 from app.core.db import get_db
 from app.dependencies.auth import get_current_user
 from app.modules.users.models import User
 from app.modules.youtube.models import Channel, Video
 from app.modules.comments.models import Comment
 from app.modules.comments.schemas import CommentPaginationResponse
-from app.modules.comments.services import sync_comments_for_video
+from app.modules.comments.services import sync_comments_for_video, sync_tiktok_comments_for_video
 from app.modules.users.social_tokens import get_social_account, get_or_refresh_social_token
 
 router = APIRouter(prefix="/videos", tags=["Comments"])
@@ -86,7 +87,7 @@ async def sync_comments(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Fetches and updates comments for a specific video from YouTube."""
+    """Fetches and updates comments for a specific video from its platform's source."""
     # 1. Verify video existence and user ownership
     video_stmt = (
         select(Video)
@@ -105,32 +106,38 @@ async def sync_comments(
             }
         )
         
-    # 2. Comment ingestion is YouTube-only — TikTok exposes no comment-read API.
-    if video.platform != providers.YOUTUBE:
+    # 2. Comment ingestion depends on the platform's configured source.
+    if not comment_analysis_supported(video.platform):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": "COMMENTS_NOT_SUPPORTED",
-                "message": "TikTok comment analysis is coming soon."
+                "message": "Comment analysis is not available for this platform right now."
             }
         )
 
-    # 3. Fetch the connected YouTube account
-    social = await get_social_account(db, current_user.id, providers.YOUTUBE)
+    # 3. YouTube comments need a connected Google account. TikTok comments are
+    #    public data fetched by video URL, so no per-user token is required.
+    social = None
+    if video.platform == providers.YOUTUBE:
+        social = await get_social_account(db, current_user.id, providers.YOUTUBE)
 
-    if not social:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "ACCOUNT_NOT_CONNECTED",
-                "message": "No connected YouTube account found. Please link your Google profile."
-            }
-        )
+        if not social:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "ACCOUNT_NOT_CONNECTED",
+                    "message": "No connected YouTube account found. Please link your Google profile."
+                }
+            )
         
     # 4. Synchronize comments
     try:
-        access_token = await get_or_refresh_social_token(db, social)
-        new_comments_count = await sync_comments_for_video(db, video, access_token)
+        if video.platform == providers.TIKTOK:
+            new_comments_count = await sync_tiktok_comments_for_video(db, video)
+        else:
+            access_token = await get_or_refresh_social_token(db, social)
+            new_comments_count = await sync_comments_for_video(db, video, access_token)
         return {
             "success": True,
             "message": f"Successfully synced comments. {new_comments_count} new comments added.",
@@ -140,11 +147,16 @@ async def sync_comments(
             }
         }
     except ValueError as e:
+        detail_code = "SYNC_FAILED"
+        message = str(e)
+        if message == "VIDEO_URL_MISSING":
+            detail_code = "VIDEO_URL_MISSING"
+            message = "This video was imported before URL capture was added. Re-sync your videos, then try again."
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "code": "SYNC_FAILED",
-                "message": str(e)
+                "code": detail_code,
+                "message": message
             }
         )
     except Exception as e:

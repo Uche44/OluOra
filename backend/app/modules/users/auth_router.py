@@ -280,7 +280,18 @@ async def youtube_callback(
 @router.get("/tiktok/url", summary="Get TikTok connection URL")
 async def get_tiktok_url(current_user: User = Depends(get_current_user)):
     """Returns the TikTok consent URL for connecting a creator's TikTok account."""
-    if not settings.TIKTOK_CLIENT_KEY:
+    # A blank redirect_uri still renders TikTok's consent page, but the code has
+    # nowhere to come back to, so fail fast with a clear server-side log instead.
+    missing = [
+        name
+        for name, value in (
+            ("TIKTOK_CLIENT_KEY", settings.TIKTOK_CLIENT_KEY),
+            ("TIKTOK_REDIRECT_URI", settings.TIKTOK_REDIRECT_URI),
+        )
+        if not value
+    ]
+    if missing:
+        logger.warning(f"TikTok connect requested but not configured: missing {', '.join(missing)}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
