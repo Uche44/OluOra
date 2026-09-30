@@ -1,6 +1,11 @@
 fastapi>=0.110.0
 uvicorn[standard]>=0.28.0
-sqlalchemy>=2.0.28
+# The [asyncio] extra pulls in `greenlet`, which SQLAlchemy's async engine needs
+# at runtime (its absence fails Alembic/app startup with "requires greenlet").
+sqlalchemy[asyncio]>=2.0.28
+# greenlet >=3.2 ships wheels for Python 3.14; pin the floor so the async engine
+# works on Render's Python 3.14 runtime without a source build.
+greenlet>=3.2.0
 asyncpg>=0.29.0
 alembic>=1.13.1
 pydantic[email]>=2.6.4

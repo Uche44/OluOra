@@ -59,7 +59,8 @@
       "Shell(git check-ignore -v admin/node_modules admin/.next admin/package-lock.json 2>&1; echo \"--- tracked file count under admin/ ---\"; git ls-files --others --exclude-standard admin | wc -l; echo \"--- sample ---\"; git ls-files --others --exclude-standard admin | head -40)",
       "Shell(git:*)",
       "Shell(npx eslint . 2 >& 1)",
-      "Shell(if:*)"
+      "Shell(if:*)",
+      "Shell(venv/bin/python -c \"import greenlet, sys; print('python', sys.version.split()[0]); print('greenlet', greenlet.__version__)\" 2>&1; echo \"---\"; venv/bin/pip show greenlet 2>/dev/null | grep -iE '^(Name|Version|Requires|Required-by)')"
     ],
     "deny": [],
     "defaultMode": "default"
