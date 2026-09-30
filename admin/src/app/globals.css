@@ -1,0 +1,197 @@
+@import "tailwindcss";
+
+/* ─── OluOra Design System ─── */
+/* Based on frontend-color.md design tokens */
+
+:root {
+  /* Surfaces */
+  --surface: #fcf9f8;
+  --surface-dim: #dcd9d9;
+  --surface-bright: #fcf9f8;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f6f3f2;
+  --surface-container: #f0eded;
+  --surface-container-high: #eae7e7;
+  --surface-container-highest: #e4e2e1;
+
+  /* On-surface */
+  --on-surface: #1b1c1c;
+  --on-surface-variant: #414944;
+  --inverse-surface: #303030;
+  --inverse-on-surface: #f3f0f0;
+
+  /* Outlines */
+  --outline: #717974;
+  --outline-variant: #c0c8c3;
+
+  /* Primary — Deep Forest Green */
+  --primary: #00261b;
+  --on-primary: #ffffff;
+  --primary-container: #0b3d2e;
+  --on-primary-container: #79a894;
+  --inverse-primary: #a0d1bc;
+  --surface-tint: #396756;
+
+  /* Secondary — Warm Gold */
+  --secondary: #735c00;
+  --on-secondary: #ffffff;
+  --secondary-container: #fed65b;
+  --on-secondary-container: #745c00;
+
+  /* Tertiary */
+  --tertiary: #1f211f;
+  --on-tertiary: #ffffff;
+  --tertiary-container: #353634;
+  --on-tertiary-container: #9f9f9c;
+
+  /* Error */
+  --error: #ba1a1a;
+  --on-error: #ffffff;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+
+  /* Fixed */
+  --primary-fixed: #bcedd7;
+  --primary-fixed-dim: #a0d1bc;
+  --on-primary-fixed: #002116;
+  --on-primary-fixed-variant: #214f3f;
+  --secondary-fixed: #ffe088;
+  --secondary-fixed-dim: #e9c349;
+  --on-secondary-fixed: #241a00;
+  --on-secondary-fixed-variant: #574500;
+
+  /* Background */
+  --background: #fcf9f8;
+  --on-background: #1b1c1c;
+  --surface-variant: #e4e2e1;
+}
+
+@theme inline {
+  /* Colors */
+  --color-surface: var(--surface);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-inverse-primary: var(--inverse-primary);
+  --color-secondary: var(--secondary);
+  --color-on-secondary: var(--on-secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-tertiary: var(--tertiary);
+  --color-error: var(--error);
+  --color-error-container: var(--error-container);
+  --color-background: var(--background);
+  --color-on-background: var(--on-background);
+
+  /* Fonts */
+  --font-playfair: var(--font-playfair);
+  --font-literata: var(--font-literata);
+  --font-sans: var(--font-literata);
+
+  /* Border radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 1.25rem;
+  --radius-full: 9999px;
+}
+
+/* ─── Base Styles ─── */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--on-surface);
+  font-family: var(--font-literata), Georgia, serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Typography Utilities ─── */
+.font-playfair {
+  font-family: var(--font-playfair), Georgia, serif;
+}
+
+.font-literata {
+  font-family: var(--font-literata), Georgia, serif;
+}
+
+/* ─── Gradient Utilities ─── */
+.gradient-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%);
+}
+
+.gradient-surface {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-container-low) 100%);
+}
+
+/* ─── Card styles ─── */
+.card-base {
+  background-color: var(--surface-container-lowest);
+  border: 1px solid rgba(0, 38, 27, 0.06);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 20px 40px rgba(11, 61, 46, 0.04), 0 2px 8px rgba(11, 61, 46, 0.02);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card-base:hover {
+  box-shadow: 0 28px 56px rgba(11, 61, 46, 0.07), 0 4px 16px rgba(11, 61, 46, 0.04);
+  transform: translateY(-2px);
+}
+
+/* ─── AI badge ─── */
+.ai-badge {
+  background-color: rgba(115, 92, 0, 0.08);
+  color: var(--secondary);
+  border: 1px solid rgba(115, 92, 0, 0.15);
+  font-family: var(--font-literata), Georgia, serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface-container-low);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--outline-variant);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--outline);
+}
+
+/* ─── Focus ring ─── */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Selection ─── */
+::selection {
+  background-color: rgba(160, 209, 188, 0.4);
+  color: var(--primary);
+}

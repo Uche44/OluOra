@@ -61,14 +61,19 @@ backend/alembic/versions/__pycache__/
 # ── Node / Frontend ───────────────────────────────────────────────────────────
 node_modules/
 frontend/node_modules/
+admin/node_modules/
 
 # Next.js build output
 frontend/.next/
 frontend/out/
 frontend/build/
+admin/.next/
+admin/out/
+admin/build/
 
 # Next.js type gen (auto-generated, not for source control)
 frontend/next-env.d.ts
+admin/next-env.d.ts
 
 # Package lock — commit package-lock.json for reproducible installs
 # (pnpm / yarn alternatives below if you switch)

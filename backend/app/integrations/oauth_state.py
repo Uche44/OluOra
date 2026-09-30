@@ -18,8 +18,16 @@ logger = logging.getLogger(__name__)
 OAUTH_STATE_TTL_MINUTES = 10
 
 
-def create_oauth_state(flow: str, user_id: str | None = None) -> str:
-    """Generate a signed random state token scoped to ``flow`` (and optionally a user)."""
+def create_oauth_state(
+    flow: str,
+    user_id: str | None = None,
+    redirect_uri: str | None = None,
+) -> str:
+    """Generate a signed random state token scoped to ``flow`` (and optionally a user).
+
+    ``redirect_uri`` records which registered callback the browser will return to
+    (e.g. the admin app), so the token exchange can present the matching URI.
+    """
     now = datetime.now(timezone.utc)
     payload = {
         "type": "oauth_state",
@@ -30,6 +38,8 @@ def create_oauth_state(flow: str, user_id: str | None = None) -> str:
     }
     if user_id is not None:
         payload["sub"] = str(user_id)
+    if redirect_uri is not None:
+        payload["redirect_uri"] = redirect_uri
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
