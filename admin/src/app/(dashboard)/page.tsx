@@ -77,7 +77,9 @@ function StatCard({
         {value}
       </div>
       {sub && (
-        <div className="text-[11px] text-on-surface-variant font-literata mt-1">{sub}</div>
+        <div className="text-[11px] text-on-surface-variant font-literata mt-1">
+          {sub}
+        </div>
       )}
     </div>
   );
@@ -116,7 +118,10 @@ export default function OverviewPage() {
         <div className="h-8 bg-surface-container rounded-lg w-1/3" />
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-28 bg-surface-container rounded-2xl" />
+            <div
+              key={i}
+              className="h-28 bg-surface-container rounded-2xl"
+            />
           ))}
         </div>
         <div className="h-64 bg-surface-container rounded-3xl" />
@@ -154,7 +159,9 @@ export default function OverviewPage() {
       className="flex flex-col gap-8 text-on-surface"
     >
       <div className="flex flex-col">
-        <h1 className="font-playfair text-3xl font-bold text-primary">Platform overview</h1>
+        <h1 className="font-playfair text-3xl font-bold text-primary">
+          Platform overview
+        </h1>
         <p className="text-on-surface-variant font-literata text-sm mt-1">
           Top-line growth and usage across OluOra. Data is live.
         </p>
@@ -185,12 +192,12 @@ export default function OverviewPage() {
           sub="free / pro"
           icon={Activity}
         />
-        <StatCard
+        {/* <StatCard
           label="Comments processed"
           value={formatNumber(overview.total_comments)}
           sub="across all videos"
           icon={MessageSquare}
-        />
+        /> */}
         <StatCard
           label="Videos synced"
           value={formatNumber(overview.total_videos)}
