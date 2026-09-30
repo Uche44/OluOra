@@ -13,6 +13,9 @@ class User(Base):
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     profile_picture: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Internal admin access. Managed from the ADMIN_EMAILS env allowlist; never
+    # settable by the user themselves.
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     plan: Mapped[str] = mapped_column(String(50), default="free", nullable=False)
     # Login identity. Data-platform connections live in SocialAccount.
     auth_provider: Mapped[str] = mapped_column(String(50), default="google", nullable=False)

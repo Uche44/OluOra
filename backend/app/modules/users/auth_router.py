@@ -109,29 +109,46 @@ async def _upsert_connection(
 # ---------------------------------------------------------------------------
 
 @router.get("/google/url", summary="Get Google sign-in URL")
-async def get_google_url():
+async def get_google_url(client: str | None = None):
     """Returns the Google consent URL and a signed state token.
 
     The login flow requests identity scopes only; connecting YouTube is a
     separate consent handled by ``/auth/youtube/url``.
+
+    Pass ``?client=admin`` from the isolated admin app so the browser returns to
+    the admin callback. The redirect target is selected server-side from config
+    (never taken from the request), so this cannot be used for open redirects.
     """
-    state = create_oauth_state(providers.FLOW_LOGIN)
-    url = google.get_google_auth_url(state=state, scopes=google.LOGIN_SCOPES)
+    redirect_uri = (
+        settings.GOOGLE_ADMIN_REDIRECT_URI
+        if client == "admin"
+        else settings.GOOGLE_REDIRECT_URI
+    )
+    state = create_oauth_state(providers.FLOW_LOGIN, redirect_uri=redirect_uri)
+    url = google.get_google_auth_url(
+        state=state,
+        scopes=google.LOGIN_SCOPES,
+        redirect_uri=redirect_uri,
+    )
     return {"url": url, "state": state}
 
 @router.post("/google/callback", response_model=TokenResponse, summary="Process Google sign-in callback")
 async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depends(get_db)):
     """Processes the callback code, upserts the user account, and issues OluOra JWTs."""
     # 0. Verify the OAuth state token to prevent login CSRF (forged/reused flows).
-    if not verify_oauth_state(payload.state, providers.FLOW_LOGIN):
+    state_payload = verify_oauth_state(payload.state, providers.FLOW_LOGIN)
+    if not state_payload:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired OAuth state. Please start the sign-in flow again.",
         )
 
-    # 1. Exchange OAuth code for Google credentials
+    # 1. Exchange OAuth code for Google credentials. The redirect URI must match
+    # the one used to obtain the code, so it is replayed from the signed state.
     try:
-        tokens = await google.exchange_code_for_tokens(payload.code)
+        tokens = await google.exchange_code_for_tokens(
+            payload.code, redirect_uri=state_payload.get("redirect_uri")
+        )
     except Exception:
         logger.exception("Google token exchange failed")
         raise HTTPException(
@@ -190,6 +207,15 @@ async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depend
         user.profile_picture = picture
         user.auth_provider = providers.GOOGLE
         user.auth_provider_id = google_id
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    # Keep admin status in sync with the env allowlist so a newly-added admin is
+    # recognized on their next login without waiting for a restart.
+    desired_admin = email.lower() in settings.admin_emails_list
+    if user.is_admin != desired_admin:
+        user.is_admin = desired_admin
         db.add(user)
         await db.commit()
         await db.refresh(user)

@@ -60,3 +60,26 @@ async def get_current_user(
         )
         
     return user
+
+
+async def require_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Dependency that allows only internal admin users through.
+
+    Reuses ``get_current_user`` (which loads the user from the DB every request),
+    so admin status is checked against live data — revoking admin access takes
+    effect immediately with no token reissue.
+
+    Returns 403 (not 401) for authenticated non-admins so callers can tell
+    "not logged in" apart from "logged in but not authorized".
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FORBIDDEN",
+                "message": "Admin access required.",
+            },
+        )
+    return current_user
