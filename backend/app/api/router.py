@@ -7,6 +7,7 @@ from app.modules.tiktok.router import router as tiktok_router
 from app.modules.comments.router import router as comments_router
 from app.modules.analysis.router import router as analysis_router
 from app.modules.admin.router import router as admin_router
+from app.modules.feedback.router import router as feedback_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -20,3 +21,4 @@ api_router.include_router(videos_router)
 api_router.include_router(comments_router)
 api_router.include_router(analysis_router)
 api_router.include_router(admin_router)
+api_router.include_router(feedback_router)

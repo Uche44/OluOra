@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -135,3 +136,26 @@ class WaitlistRow(BaseModel):
 class PaginatedWaitlist(BaseModel):
     data: list[WaitlistRow]
     pagination: PaginationMeta
+
+
+class FeedbackRow(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID | None = None
+    email: EmailStr | None = None
+    rating: int | None = None
+    category: str
+    message: str
+    page: str | None = None
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedFeedback(BaseModel):
+    data: list[FeedbackRow]
+    pagination: PaginationMeta
+
+
+class FeedbackStatusUpdate(BaseModel):
+    status: Literal["new", "resolved"]

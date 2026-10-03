@@ -6,12 +6,14 @@ admin surface is metrics-only in Phase 1.
 
 from datetime import datetime, timedelta, timezone
 
+from fastapi import HTTPException, status
 from sqlalchemy import distinct, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.modules.analysis.models import Analysis, AnalysisJob, Insight
 from app.modules.comments.models import Comment
+from app.modules.feedback.models import Feedback
 from app.modules.users.models import ApiQuotaUsage, SocialAccount, User
 from app.modules.waitlist.models import WaitlistEntry
 from app.modules.youtube.models import Channel, Video
@@ -432,3 +434,68 @@ async def list_waitlist(
     )
 
     return {"data": entries, "pagination": _pagination(page, limit, total)}
+
+
+async def list_feedback(
+    db: AsyncSession,
+    page: int,
+    limit: int,
+    search: str | None = None,
+    category: str | None = None,
+    status: str | None = None,
+) -> dict:
+    page = max(1, page)
+    limit = max(1, min(limit, 100))
+
+    conditions = []
+    if search:
+        like = f"%{search.strip().lower()}%"
+        conditions.append(
+            func.lower(func.coalesce(Feedback.email, "")).like(like)
+            | func.lower(Feedback.message).like(like)
+        )
+    if category:
+        conditions.append(Feedback.category == category)
+    if status:
+        conditions.append(Feedback.status == status)
+
+    count_stmt = select(func.count()).select_from(Feedback)
+    list_stmt = select(Feedback)
+    for condition in conditions:
+        count_stmt = count_stmt.where(condition)
+        list_stmt = list_stmt.where(condition)
+
+    total = int((await db.execute(count_stmt)).scalar() or 0)
+    entries = (
+        (
+            await db.execute(
+                list_stmt.order_by(Feedback.created_at.desc())
+                .offset((page - 1) * limit)
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    return {"data": entries, "pagination": _pagination(page, limit, total)}
+
+
+async def update_feedback_status(db: AsyncSession, feedback_id, new_status: str) -> Feedback:
+    entry = (
+        await db.execute(select(Feedback).where(Feedback.id == feedback_id))
+    ).scalar_one_or_none()
+
+    if not entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "FEEDBACK_NOT_FOUND",
+                "message": "Feedback entry not found.",
+            },
+        )
+
+    entry.status = new_status
+    await db.commit()
+    await db.refresh(entry)
+    return entry
