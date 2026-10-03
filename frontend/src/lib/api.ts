@@ -109,3 +109,31 @@ export async function authedFetch(url: string, options: RequestInit = {}): Promi
 
   return res;
 }
+
+export type FeedbackCategory = "bug" | "idea" | "praise" | "other";
+
+export interface FeedbackPayload {
+  rating: number | null;
+  category: FeedbackCategory;
+  message: string;
+  /** Optional label for where the widget was opened from, for context. */
+  page?: string | null;
+}
+
+/** Submit creator feedback to the authenticated /feedback endpoint. */
+export async function submitFeedback(payload: FeedbackPayload): Promise<void> {
+  const res = await authedFetch(`${apiUrl}/api/v1/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const detail = err?.detail;
+    throw new Error(
+      (typeof detail === "string" ? detail : detail?.message) ||
+        "Could not submit your feedback. Please try again.",
+    );
+  }
+}

@@ -20,6 +20,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/lib/api";
+import FeedbackProvider from "@/components/feedback/FeedbackProvider";
+import FeedbackLauncher from "@/components/feedback/FeedbackLauncher";
+import FeedbackSidebarButton from "@/components/feedback/FeedbackSidebarButton";
 
 interface UserSession {
   email: string;
@@ -165,6 +168,7 @@ export default function DashboardLayout({
             <HelpCircle className="w-4 h-4" />
             <span>Help</span>
           </Link>
+          <FeedbackSidebarButton onBeforeOpen={() => setMobileOpen(false)} />
           <button
             onClick={() => {
               setMobileOpen(false);
@@ -181,7 +185,8 @@ export default function DashboardLayout({
   );
 
   return (
-    <div className="min-h-screen flex bg-surface text-on-surface overflow-x-hidden">
+    <FeedbackProvider>
+      <div className="min-h-screen flex bg-surface text-on-surface overflow-x-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 border-r border-outline-variant/20 bg-surface-container-lowest flex-shrink-0 h-screen sticky top-0">
         <SidebarContent />
@@ -274,7 +279,10 @@ export default function DashboardLayout({
           </aside>
         </div>
       )}
-    </div>
+
+      <FeedbackLauncher />
+      </div>
+    </FeedbackProvider>
   );
 }
 

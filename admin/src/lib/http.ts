@@ -8,3 +8,16 @@ export async function getJson<T>(path: string): Promise<T> {
   }
   return res.json();
 }
+
+/** PATCH an admin endpoint with a JSON body, throwing on non-2xx. */
+export async function patchJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await adminFetch(`${apiUrl}/api/v1${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+  return res.json();
+}

@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,3 +77,28 @@ async def admin_waitlist(
     db: AsyncSession = Depends(get_db),
 ):
     return await services.list_waitlist(db, page, limit, search)
+
+
+@router.get("/feedback", response_model=schemas.PaginatedFeedback, summary="List feedback submissions")
+async def admin_feedback(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: str | None = None,
+    category: str | None = None,
+    status: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    return await services.list_feedback(db, page, limit, search, category, status)
+
+
+@router.patch(
+    "/feedback/{feedback_id}",
+    response_model=schemas.FeedbackRow,
+    summary="Update a feedback submission's status",
+)
+async def admin_update_feedback(
+    feedback_id: uuid.UUID,
+    payload: schemas.FeedbackStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    return await services.update_feedback_status(db, feedback_id, payload.status)

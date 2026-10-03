@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Activity,
   Server,
+  MessageSquare,
   LogOut,
   Menu,
   X,
@@ -23,6 +24,7 @@ const navItems = [
   { label: "Funnel", href: "/funnel", icon: TrendingUp },
   { label: "Users", href: "/users", icon: Users },
   { label: "Waitlist", href: "/waitlist", icon: ClipboardList },
+  { label: "Feedback", href: "/feedback", icon: MessageSquare },
   { label: "API Usage", href: "/usage", icon: Activity },
   { label: "Job Health", href: "/jobs", icon: Server },
 ];
