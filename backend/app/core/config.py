@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     TIKTOK_CLIENT_SECRET: str = ""
     # Must be an HTTPS, registered redirect URI (no query params/fragments).
     TIKTOK_REDIRECT_URI: str = ""
+    # Emails allowed to connect TikTok while the integration is in beta.
+    # Comma-separated; empty means nobody can connect TikTok (hidden for all).
+    TIKTOK_BETA_EMAILS: str = ""
 
     # TikTok comment ingestion (ScrapeCreators)
     # TikTok's Display API exposes no comment-read endpoint to commercial apps, so
@@ -87,6 +90,11 @@ class Settings(BaseSettings):
     def admin_emails_list(self) -> List[str]:
         # Normalized lowercase for case-insensitive email matching.
         return [i.strip().lower() for i in self.ADMIN_EMAILS.split(",") if i.strip()]
+
+    @property
+    def tiktok_beta_emails_list(self) -> List[str]:
+        # Normalized lowercase for case-insensitive email matching.
+        return [i.strip().lower() for i in self.TIKTOK_BETA_EMAILS.split(",") if i.strip()]
 
 settings = Settings()
 

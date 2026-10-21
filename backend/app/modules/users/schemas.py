@@ -64,6 +64,7 @@ class UserProfileResponse(BaseModel):
     profile_picture: str | None = None
     is_active: bool
     auth_provider: str = "google"
+    can_connect_tiktok: bool = False
     created_at: datetime
     connections: list[ConnectedAccountSchema] = []
     channels: list[ConnectedChannelSchema] = []

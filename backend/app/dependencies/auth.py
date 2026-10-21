@@ -3,6 +3,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import decode_token
 from app.modules.users.models import User
@@ -80,6 +81,30 @@ async def require_admin(
             detail={
                 "code": "FORBIDDEN",
                 "message": "Admin access required.",
+            },
+        )
+    return current_user
+
+
+def can_connect_tiktok(user: User) -> bool:
+    """True if the user's email is on the TikTok-beta allowlist."""
+    return user.email.lower() in settings.tiktok_beta_emails_list
+
+
+async def require_tiktok_beta(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Allow only allowlisted users through to the TikTok connect endpoints.
+
+    Returns 403 (not 401) for authenticated non-allowlisted users so callers can
+    tell "not logged in" apart from "this integration isn't available to you".
+    """
+    if not can_connect_tiktok(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "TIKTOK_NOT_AVAILABLE",
+                "message": "TikTok connection is not available for your account.",
             },
         )
     return current_user
