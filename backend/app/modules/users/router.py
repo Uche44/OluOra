@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import providers
 from app.core.db import get_db
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, can_connect_tiktok
 from app.integrations import tiktok
 from app.modules.users.models import User, SocialAccount
 from app.modules.users.schemas import (
@@ -67,6 +67,7 @@ def _serialize_profile(user: User, socials, channels) -> UserProfileResponse:
         profile_picture=user.profile_picture,
         is_active=user.is_active,
         auth_provider=user.auth_provider,
+        can_connect_tiktok=can_connect_tiktok(user),
         created_at=user.created_at,
         connections=connections,
         channels=channels_data

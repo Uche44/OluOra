@@ -76,6 +76,7 @@ Ensure these variables are set in your backend hosting console:
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID | `your-google-client-id.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET`| Google OAuth Secret key | `GOCSPX-your-secret-key` |
 | `GOOGLE_REDIRECT_URI` | Google Auth Callback endpoint URL | `https://your-frontend.vercel.app/auth/callback` |
+| `TIKTOK_BETA_EMAILS` | Comma-separated emails allowed to connect TikTok while in beta (empty hides TikTok for everyone) | `beta@yourdomain.com` |
 
 ---
 

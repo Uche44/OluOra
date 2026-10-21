@@ -21,6 +21,22 @@ async def test_tiktok_url_requires_auth(client: AsyncClient):
     assert response.status_code in (401, 403)
 
 
+async def test_tiktok_url_forbidden_when_not_allowlisted(client: AsyncClient, db: AsyncSession):
+    user = User(email="tiktok_not_beta@example.com", full_name="Not Beta", is_active=True)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    token = create_access_token({"sub": str(user.id)})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with patch.object(settings, "TIKTOK_BETA_EMAILS", "someone_else@example.com"):
+        response = await client.get("/api/v1/auth/tiktok/url", headers=headers)
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "TIKTOK_NOT_AVAILABLE"
+
+
 async def test_tiktok_url_returns_consent_url(client: AsyncClient, db: AsyncSession):
     user = User(email="tiktok_url@example.com", full_name="TikTok URL", is_active=True)
     db.add(user)
@@ -30,7 +46,8 @@ async def test_tiktok_url_returns_consent_url(client: AsyncClient, db: AsyncSess
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    with patch.object(settings, "TIKTOK_CLIENT_KEY", "test-client-key"), \
+    with patch.object(settings, "TIKTOK_BETA_EMAILS", "tiktok_url@example.com"), \
+         patch.object(settings, "TIKTOK_CLIENT_KEY", "test-client-key"), \
          patch.object(settings, "TIKTOK_REDIRECT_URI", "https://example.com/auth/tiktok/callback"):
         response = await client.get("/api/v1/auth/tiktok/url", headers=headers)
 
@@ -53,10 +70,32 @@ async def test_tiktok_callback_rejects_wrong_flow_state(client: AsyncClient, db:
 
     # A login-flow state must not be reusable to connect TikTok.
     state = create_oauth_state(providers.FLOW_LOGIN, user_id=user.id)
-    response = await client.post(
-        "/api/v1/auth/tiktok/callback", json={"code": "abc", "state": state}, headers=headers
-    )
+    with patch.object(settings, "TIKTOK_BETA_EMAILS", "tiktok_badstate@example.com"):
+        response = await client.post(
+            "/api/v1/auth/tiktok/callback", json={"code": "abc", "state": state}, headers=headers
+        )
     assert response.status_code == 400
+
+
+async def test_tiktok_callback_forbidden_when_not_allowlisted(
+    client: AsyncClient, db: AsyncSession
+):
+    user = User(email="tiktok_cb_not_beta@example.com", full_name="Not Beta", is_active=True)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    token = create_access_token({"sub": str(user.id)})
+    headers = {"Authorization": f"Bearer {token}"}
+    state = create_oauth_state(providers.FLOW_TIKTOK_CONNECT, user_id=user.id)
+
+    with patch.object(settings, "TIKTOK_BETA_EMAILS", "someone_else@example.com"):
+        response = await client.post(
+            "/api/v1/auth/tiktok/callback", json={"code": "abc", "state": state}, headers=headers
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "TIKTOK_NOT_AVAILABLE"
 
 
 async def test_tiktok_callback_connects_account(client: AsyncClient, db: AsyncSession):
@@ -69,7 +108,8 @@ async def test_tiktok_callback_connects_account(client: AsyncClient, db: AsyncSe
     headers = {"Authorization": f"Bearer {token}"}
     state = create_oauth_state(providers.FLOW_TIKTOK_CONNECT, user_id=user.id)
 
-    with patch("app.integrations.tiktok.exchange_code_for_tokens", new_callable=AsyncMock) as mock_exchange, \
+    with patch.object(settings, "TIKTOK_BETA_EMAILS", "tiktok_connect@example.com"), \
+         patch("app.integrations.tiktok.exchange_code_for_tokens", new_callable=AsyncMock) as mock_exchange, \
          patch("app.integrations.tiktok.fetch_user_info", new_callable=AsyncMock) as mock_user_info, \
          patch("app.integrations.tiktok.fetch_user_videos", new_callable=AsyncMock) as mock_videos:
         mock_exchange.return_value = {

@@ -1,12 +1,14 @@
 import pytest
 import uuid
 from datetime import datetime, timezone, timedelta
+from unittest.mock import patch
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.users.models import User, SocialAccount
 from app.modules.youtube.models import Channel
+from app.core.config import settings
 from app.core.security import create_access_token
 
 pytestmark = pytest.mark.asyncio
@@ -58,6 +60,28 @@ async def test_get_me_success(client: AsyncClient, db: AsyncSession):
     assert data["connections"][0]["provider"] == "youtube"
     assert len(data["channels"]) == 1
     assert data["channels"][0]["title"] == "Settings Channel"
+
+
+async def test_get_me_exposes_can_connect_tiktok(client: AsyncClient, db: AsyncSession):
+    user = User(email="tiktok_beta_user@gmail.com", full_name="Beta User", is_active=True)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    token = create_access_token({"sub": str(user.id)})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Not on the allowlist -> hidden.
+    with patch.object(settings, "TIKTOK_BETA_EMAILS", "someone_else@gmail.com"):
+        response = await client.get("/api/v1/users/me", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["can_connect_tiktok"] is False
+
+    # On the allowlist (case-insensitive match) -> visible.
+    with patch.object(settings, "TIKTOK_BETA_EMAILS", "TikTok_Beta_User@Gmail.com"):
+        response = await client.get("/api/v1/users/me", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["can_connect_tiktok"] is True
 
 
 async def test_update_me(client: AsyncClient, db: AsyncSession):

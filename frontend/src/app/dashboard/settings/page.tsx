@@ -37,6 +37,7 @@ interface UserProfile {
   profile_picture: string | null;
   is_active: boolean;
   auth_provider: string;
+  can_connect_tiktok: boolean;
   created_at: string;
   connections: ConnectedAccount[];
   channels: ConnectedChannel[];
@@ -215,6 +216,10 @@ export default function SettingsPage() {
     );
   }
 
+  const visibleProviders = PROVIDERS.filter(
+    (p) => p.id !== "tiktok" || profile?.can_connect_tiktok === true,
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -339,7 +344,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex flex-col gap-5">
-            {PROVIDERS.map((provider) => {
+            {visibleProviders.map((provider) => {
               const account = profile?.connections.find((c) => c.provider === provider.id);
               const channel = profile?.channels.find((c) => c.platform === provider.id);
               const isConfirming = confirmDisconnect === provider.id;

@@ -12,7 +12,7 @@ from app.core import providers
 from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import create_access_token, create_refresh_token
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, require_tiktok_beta
 from app.modules.users.models import User, SocialAccount
 from app.modules.users.schemas import UserResponse
 from app.modules.users import token_service
@@ -304,7 +304,7 @@ async def youtube_callback(
 # ---------------------------------------------------------------------------
 
 @router.get("/tiktok/url", summary="Get TikTok connection URL")
-async def get_tiktok_url(current_user: User = Depends(get_current_user)):
+async def get_tiktok_url(current_user: User = Depends(require_tiktok_beta)):
     """Returns the TikTok consent URL for connecting a creator's TikTok account."""
     # A blank redirect_uri still renders TikTok's consent page, but the code has
     # nowhere to come back to, so fail fast with a clear server-side log instead.
@@ -332,7 +332,7 @@ async def get_tiktok_url(current_user: User = Depends(get_current_user)):
 @router.post("/tiktok/callback", summary="Connect a TikTok account")
 async def tiktok_callback(
     payload: GoogleLoginRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_tiktok_beta),
     db: AsyncSession = Depends(get_db),
 ):
     """Exchanges the consent code, stores the TikTok connection, and imports the video catalog."""
