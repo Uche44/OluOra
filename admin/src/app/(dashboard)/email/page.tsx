@@ -38,6 +38,8 @@ interface QueueResponse {
   recipients: number;
   queued: number;
   batch_id: string | null;
+  skipped: number;
+  skipped_emails: string[];
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -45,7 +47,37 @@ const CATEGORY_LABEL: Record<string, string> = {
   feedback_reminder: "Feedback reminder",
   waitlist_welcome: "Waitlist welcome",
   waitlist_broadcast: "Waitlist broadcast",
+  admin_message: "Direct message",
 };
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Split a free-typed list of addresses into a de-duplicated set. */
+function parseRecipients(raw: string): string[] {
+  return Array.from(
+    new Set(
+      raw
+        .split(/[\s,;]+/)
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+}
+
+/** Human summary of a completed send, including anyone withheld for opting out. */
+function describeResult(data: QueueResponse): string {
+  const parts = [
+    data.queued > 0
+      ? `Queued ${data.queued} email${data.queued === 1 ? "" : "s"}.`
+      : "No eligible recipients, nothing sent.",
+  ];
+  if (data.skipped_emails.length > 0) {
+    parts.push(
+      `Skipped ${data.skipped_emails.length} opted out: ${data.skipped_emails.join(", ")}.`,
+    );
+  }
+  return parts.join(" ");
+}
 
 const STATUS_STYLES: Record<string, string> = {
   sent: "text-emerald-700 bg-emerald-50 border-emerald-200",
@@ -108,7 +140,7 @@ export default function EmailPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <WaitlistBroadcastCard
+        <ComposeCard
           onSent={(msg) => {
             setNotice(msg);
             setPage(1);
@@ -278,7 +310,7 @@ function useSender(
   onError: (msg: string) => void,
 ) {
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<number | null>(null);
+  const [preview, setPreview] = useState<QueueResponse | null>(null);
 
   const run = async (dryRun: boolean) => {
     setBusy(true);
@@ -289,14 +321,10 @@ function useSender(
         dry_run: dryRun,
       });
       if (dryRun) {
-        setPreview(data.recipients);
+        setPreview(data);
       } else {
         setPreview(null);
-        onSent(
-          data.queued > 0
-            ? `Queued ${data.queued} email${data.queued === 1 ? "" : "s"}.`
-            : "No eligible recipients — nothing sent.",
-        );
+        onSent(describeResult(data));
       }
     } catch (err) {
       onError(err instanceof Error ? err.message : "Request failed.");
@@ -308,7 +336,7 @@ function useSender(
   return { busy, preview, setPreview, run };
 }
 
-function WaitlistBroadcastCard({
+function ComposeCard({
   onSent,
   onError,
 }: {
@@ -320,29 +348,40 @@ function WaitlistBroadcastCard({
   const [body, setBody] = useState("");
   const [limit, setLimit] = useState("");
   const [includeExisting, setIncludeExisting] = useState(false);
+  const [recipientInput, setRecipientInput] = useState("");
 
+  const addresses = parseRecipients(recipientInput);
+  const namedRecipients = addresses.length > 0;
+  const malformed = addresses.filter((value) => !EMAIL_PATTERN.test(value));
+
+  // Naming addresses overrides the waitlist selection, so the waitlist-only
+  // controls are left out of the payload entirely rather than sent and ignored.
   const payload = () => ({
     subject,
     heading: heading || undefined,
     body,
-    limit: limit ? Number(limit) : undefined,
-    include_existing_users: includeExisting,
+    ...(namedRecipients
+      ? { recipients: addresses }
+      : {
+          limit: limit ? Number(limit) : undefined,
+          include_existing_users: includeExisting,
+        }),
   });
 
   const { busy, preview, setPreview, run } = useSender(
-    "/admin/email/waitlist-broadcast",
+    "/admin/email/broadcast",
     payload,
     onSent,
     onError,
   );
 
-  const invalid = !subject.trim() || !body.trim();
+  const invalid = !subject.trim() || !body.trim() || malformed.length > 0;
 
   return (
     <Card
       icon={Users}
-      title="Waitlist broadcast"
-      description="Compose one email and send it to your waitlist."
+      title="Compose a message"
+      description="Send to your waitlist, or to specific addresses you name."
     >
       <div className="flex flex-col gap-3">
         <input
@@ -357,7 +396,7 @@ function WaitlistBroadcastCard({
         <input
           value={heading}
           onChange={(e) => setHeading(e.target.value)}
-          placeholder="Heading (optional — defaults to the subject)"
+          placeholder="Heading (optional, defaults to the subject)"
           className={inputClass}
         />
         <textarea
@@ -370,28 +409,60 @@ function WaitlistBroadcastCard({
           rows={7}
           className={cn(inputClass, "resize-y")}
         />
-        <div className="flex items-center gap-3 flex-wrap">
+
+        <div className="flex flex-col gap-1.5">
+          <label className="font-literata text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+            Recipients
+          </label>
           <input
-            value={limit}
+            value={recipientInput}
             onChange={(e) => {
-              setLimit(e.target.value.replace(/[^0-9]/g, ""));
+              setRecipientInput(e.target.value);
               setPreview(null);
             }}
-            placeholder="Max recipients"
-            className={cn(inputClass, "w-36")}
+            placeholder="you@example.com, someone@example.com"
+            className={inputClass}
           />
-          <label className="flex items-center gap-2 font-literata text-xs text-on-surface-variant cursor-pointer">
+          <p className="font-literata text-[11px] text-on-surface-variant">
+            {namedRecipients
+              ? `${
+                  addresses.length === 1
+                    ? "Only this address receives"
+                    : `Only these ${addresses.length} addresses receive`
+                } it, and the waitlist is ignored. Recipients we know about get an unsubscribe link.`
+              : "Leave this empty to send to your waitlist."}
+          </p>
+          {malformed.length > 0 && (
+            <p className="font-literata text-[11px] text-red-700">
+              Not a valid address: {malformed.join(", ")}
+            </p>
+          )}
+        </div>
+
+        {!namedRecipients && (
+          <div className="flex items-center gap-3 flex-wrap">
             <input
-              type="checkbox"
-              checked={includeExisting}
+              value={limit}
               onChange={(e) => {
-                setIncludeExisting(e.target.checked);
+                setLimit(e.target.value.replace(/[^0-9]/g, ""));
                 setPreview(null);
               }}
+              placeholder="Max recipients"
+              className={cn(inputClass, "w-36")}
             />
-            Include people who already signed up
-          </label>
-        </div>
+            <label className="flex items-center gap-2 font-literata text-xs text-on-surface-variant cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeExisting}
+                onChange={(e) => {
+                  setIncludeExisting(e.target.checked);
+                  setPreview(null);
+                }}
+              />
+              Include people who already signed up
+            </label>
+          </div>
+        )}
 
         <SendActions
           busy={busy}
@@ -399,7 +470,7 @@ function WaitlistBroadcastCard({
           preview={preview}
           onPreview={() => run(true)}
           onSend={() => run(false)}
-          sendLabel="Send to waitlist"
+          sendLabel={namedRecipients ? "Send to addresses" : "Send to waitlist"}
         />
       </div>
     </Card>
@@ -482,19 +553,19 @@ function SendActions({
 }: {
   busy: boolean;
   disabled: boolean;
-  preview: number | null;
+  preview: QueueResponse | null;
   onPreview: () => void;
   onSend: () => void;
   sendLabel: string;
 }) {
   const [confirming, setConfirming] = useState(false);
 
-  if (confirming && preview !== null) {
+  if (confirming && preview) {
     return (
       <div className="flex items-center gap-2 flex-wrap p-3 rounded-xl bg-surface-container border border-outline-variant/20">
         <span className="font-literata text-xs text-on-surface-variant">
-          Send to <strong className="text-primary">{preview}</strong> recipient
-          {preview === 1 ? "" : "s"}?
+          Send to <strong className="text-primary">{preview.recipients}</strong> recipient
+          {preview.recipients === 1 ? "" : "s"}?
         </span>
         <button
           onClick={() => {
@@ -529,19 +600,20 @@ function SendActions({
       >
         Preview recipients
       </button>
-      {preview !== null && (
+      {preview && (
         <button
           onClick={() => setConfirming(true)}
-          disabled={busy || disabled || preview === 0}
+          disabled={busy || disabled || preview.recipients === 0}
           className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-on-primary text-xs font-semibold font-literata hover:opacity-90 disabled:opacity-40 transition cursor-pointer"
         >
           <Send className="w-3.5 h-3.5" />
           {sendLabel}
         </button>
       )}
-      {preview !== null && (
+      {preview && (
         <span className="font-literata text-xs text-on-surface-variant">
-          {preview} eligible
+          {preview.recipients} eligible
+          {preview.skipped > 0 && `, ${preview.skipped} opted out`}
         </span>
       )}
     </div>

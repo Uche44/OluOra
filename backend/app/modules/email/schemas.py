@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class EmailMessageRow(BaseModel):
@@ -64,6 +64,9 @@ class WaitlistBroadcastRequest(BaseModel):
     # Include people who have since created an account (default: skip them).
     include_existing_users: bool = False
     dry_run: bool = False
+    # Addresses the admin typed by hand. When non-empty the message goes only to
+    # these, and the waitlist selection (limit / include_existing_users) is ignored.
+    recipients: list[EmailStr] = Field(default_factory=list, max_length=25)
 
 
 class QueueResponse(BaseModel):
@@ -71,3 +74,7 @@ class QueueResponse(BaseModel):
     recipients: int
     queued: int
     batch_id: uuid.UUID | None = None
+    # Addresses withheld because they had opted out, so the admin can see why a
+    # typed-in address was not mailed.
+    skipped: int = 0
+    skipped_emails: list[str] = Field(default_factory=list)

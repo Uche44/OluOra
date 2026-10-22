@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 
 from app.main import app
 from app.core.config import settings
-from app.core.db import get_db, Base
+from app.core.db import Base, engine as app_engine, get_db
 
 # Use NullPool for testing to prevent open pooled connections from throwing loop-closed errors on teardown
 engine = create_async_engine(
@@ -27,6 +27,21 @@ def cleanup_engine():
     yield
     # Dispose engine connections on test session teardown synchronously
     asyncio.run(engine.dispose())
+
+
+@pytest.fixture(autouse=True)
+async def reset_app_engine():
+    """Drop app.core.db's connection pool after every test.
+
+    Background tasks (email sends) open their own sessions from the application
+    engine, which is a real pool rather than this file's NullPool. asyncpg
+    connections are bound to the event loop that created them, and pytest-asyncio
+    gives each test a fresh loop, so a pooled connection left over from an earlier
+    test is unusable and surfaces as "Event loop is closed". A server runs one
+    long-lived loop, so this only affects the test harness.
+    """
+    yield
+    await app_engine.dispose()
 
 @pytest.fixture(scope="function")
 async def db() -> AsyncGenerator[AsyncSession, None]:

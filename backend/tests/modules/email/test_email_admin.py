@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from httpx import AsyncClient
@@ -37,6 +38,7 @@ def queued_tasks(monkeypatch):
 
     monkeypatch.setattr(email_admin_router, "send_feedback_reminders_task", spy)
     monkeypatch.setattr(email_admin_router, "send_waitlist_broadcast_task", spy)
+    monkeypatch.setattr(email_admin_router, "send_admin_message_task", spy)
     monkeypatch.setattr(email_internal_router, "send_feedback_reminders_task", spy)
     return calls
 
@@ -126,7 +128,7 @@ async def test_waitlist_broadcast_dry_run_and_send(
     await db.commit()
 
     dry = await client.post(
-        "/api/v1/admin/email/waitlist-broadcast",
+        "/api/v1/admin/email/broadcast",
         headers=_auth(admin),
         json={"subject": "We're live", "body": "First para.\n\nSecond para.", "dry_run": True},
     )
@@ -135,7 +137,7 @@ async def test_waitlist_broadcast_dry_run_and_send(
     assert dry.json()["batch_id"] is None
 
     sent = await client.post(
-        "/api/v1/admin/email/waitlist-broadcast",
+        "/api/v1/admin/email/broadcast",
         headers=_auth(admin),
         json={"subject": "We're live", "body": "First para.\n\nSecond para."},
     )
@@ -151,18 +153,143 @@ async def test_waitlist_broadcast_validates_payload(
     headers = _auth(admin)
 
     missing_subject = await client.post(
-        "/api/v1/admin/email/waitlist-broadcast",
+        "/api/v1/admin/email/broadcast",
         headers=headers,
         json={"subject": "", "body": "Body"},
     )
     assert missing_subject.status_code == 422
 
     missing_body = await client.post(
-        "/api/v1/admin/email/waitlist-broadcast",
+        "/api/v1/admin/email/broadcast",
         headers=headers,
         json={"subject": "Subject", "body": ""},
     )
     assert missing_body.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Addressing specific recipients
+# ---------------------------------------------------------------------------
+async def test_broadcast_dry_run_counts_named_recipients(
+    client: AsyncClient, db: AsyncSession, queued_tasks
+):
+    admin = await _make_user(db, "email_admin7@oluora.com", is_admin=True)
+
+    response = await client.post(
+        "/api/v1/admin/email/broadcast",
+        headers=_auth(admin),
+        json={
+            "subject": "A note",
+            "body": "Body text.",
+            "recipients": ["someone@example.com", "SOMEONE@example.com"],
+            "dry_run": True,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["recipients"] == 1  # de-duplicated case-insensitively
+    assert body["skipped"] == 0
+    assert queued_tasks == []
+
+
+async def test_broadcast_sends_to_named_recipients(
+    client: AsyncClient, db: AsyncSession, queued_tasks
+):
+    admin = await _make_user(db, "email_admin8@oluora.com", is_admin=True)
+
+    response = await client.post(
+        "/api/v1/admin/email/broadcast",
+        headers=_auth(admin),
+        json={
+            "subject": "A note",
+            "body": "Body text.",
+            "recipients": ["someone@example.com"],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["queued"] == 1
+    assert body["batch_id"] is not None
+    assert len(queued_tasks) == 1
+    _args, kwargs = queued_tasks[0]
+    assert kwargs["emails"] == ["someone@example.com"]
+
+
+async def test_broadcast_ignores_the_waitlist_when_addresses_are_named(
+    client: AsyncClient, db: AsyncSession, queued_tasks
+):
+    admin = await _make_user(db, "email_admin9@oluora.com", is_admin=True)
+    db.add(WaitlistEntry(email="waiting@oluora.com", source="test"))
+    await db.commit()
+
+    response = await client.post(
+        "/api/v1/admin/email/broadcast",
+        headers=_auth(admin),
+        json={
+            "subject": "A note",
+            "body": "Body text.",
+            "recipients": ["someone@example.com"],
+            "dry_run": True,
+        },
+    )
+
+    assert response.json()["recipients"] == 1  # the named address, not the waitlist
+
+
+async def test_broadcast_withholds_opted_out_addresses(
+    client: AsyncClient, db: AsyncSession, queued_tasks
+):
+    admin = await _make_user(db, "email_admin10@oluora.com", is_admin=True)
+    gone = await _make_user(db, "gone@oluora.com")
+    gone.email_opt_out_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    response = await client.post(
+        "/api/v1/admin/email/broadcast",
+        headers=_auth(admin),
+        json={
+            "subject": "A note",
+            "body": "Body text.",
+            "recipients": ["gone@oluora.com"],
+            "dry_run": True,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["recipients"] == 0
+    assert body["skipped"] == 1
+    assert body["skipped_emails"] == ["gone@oluora.com"]
+
+
+async def test_broadcast_rejects_malformed_recipients(
+    client: AsyncClient, db: AsyncSession, queued_tasks
+):
+    admin = await _make_user(db, "email_admin11@oluora.com", is_admin=True)
+    response = await client.post(
+        "/api/v1/admin/email/broadcast",
+        headers=_auth(admin),
+        json={"subject": "A note", "body": "Body text.", "recipients": ["not-an-email"]},
+    )
+    assert response.status_code == 422
+
+
+async def test_broadcast_caps_the_recipient_list(
+    client: AsyncClient, db: AsyncSession, queued_tasks
+):
+    admin = await _make_user(db, "email_admin12@oluora.com", is_admin=True)
+    response = await client.post(
+        "/api/v1/admin/email/broadcast",
+        headers=_auth(admin),
+        json={
+            "subject": "A note",
+            "body": "Body text.",
+            "recipients": [f"person{i}@example.com" for i in range(26)],
+        },
+    )
+    assert response.status_code == 422
 
 
 # ---------------------------------------------------------------------------

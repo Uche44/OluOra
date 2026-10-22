@@ -32,7 +32,7 @@ def test_transactional_template_has_no_unsubscribe_link():
 
 def test_broadcast_renders_paragraphs_and_heading():
     html, text = render_email(
-        "waitlist_broadcast",
+        "message",
         heading="We're live",
         paragraphs=["First paragraph.", "Second paragraph."],
     )

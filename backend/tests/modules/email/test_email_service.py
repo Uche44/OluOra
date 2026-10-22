@@ -309,3 +309,53 @@ async def test_list_messages_filters_and_paginates(db: AsyncSession):
 
     searched = await EmailService.list_messages(db, page=1, limit=10, search="one@")
     assert any(row.to_email == "one@oluora.com" for row in searched["data"])
+
+
+# ---------------------------------------------------------------------------
+# Addresses an admin typed by hand
+# ---------------------------------------------------------------------------
+async def test_resolve_recipients_matches_users_then_waitlist(db: AsyncSession):
+    user = await _make_user(db, "member@oluora.com")
+    entry = await _add_waitlist(db, "waiter@oluora.com")
+
+    recipients, skipped = await EmailService.resolve_recipients(
+        db, ["member@oluora.com", "waiter@oluora.com", "stranger@example.com"]
+    )
+
+    assert skipped == []
+    by_email = {recipient.email: recipient for recipient in recipients}
+
+    # A known user gets their own opt-out scope so the link actually works.
+    assert by_email["member@oluora.com"].opt_out_scope == "user"
+    assert by_email["member@oluora.com"].user_id == user.id
+    assert by_email["member@oluora.com"].opt_out_scope != "waitlist"
+
+    assert by_email["waiter@oluora.com"].opt_out_scope == "waitlist"
+    assert by_email["waiter@oluora.com"].opt_out_id == entry.id
+
+    # An address we cannot match is still delivered, just without an opt-out link.
+    assert by_email["stranger@example.com"].opt_out_scope is None
+    assert by_email["stranger@example.com"].user_id is None
+
+
+async def test_resolve_recipients_withholds_opt_outs(db: AsyncSession):
+    await _make_user(db, "left@oluora.com", opted_out=True)
+    await _add_waitlist(db, "unsub@oluora.com", unsubscribed=True)
+
+    recipients, skipped = await EmailService.resolve_recipients(
+        db, ["left@oluora.com", "unsub@oluora.com", "fine@example.com"]
+    )
+
+    assert [recipient.email for recipient in recipients] == ["fine@example.com"]
+    assert sorted(skipped) == ["left@oluora.com", "unsub@oluora.com"]
+
+
+async def test_resolve_recipients_dedupes_case_insensitively(db: AsyncSession):
+    recipients, skipped = await EmailService.resolve_recipients(
+        db, ["Someone@Example.com", "someone@example.com", "  ", ""]
+    )
+
+    assert len(recipients) == 1
+    assert recipients[0].email == "Someone@Example.com"
+    assert skipped == []
+

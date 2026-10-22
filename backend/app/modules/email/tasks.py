@@ -12,7 +12,7 @@ import uuid
 from app.core.config import settings
 from app.core.db import SessionLocal
 from app.modules.email.models import EmailBatch
-from app.modules.email.services import EmailService
+from app.modules.email.services import ADMIN_MESSAGE_CATEGORY, EmailService
 from app.modules.users.models import User
 from app.modules.waitlist.models import WaitlistEntry
 
@@ -142,7 +142,7 @@ async def send_waitlist_broadcast_task(
                 category="waitlist_broadcast",
                 to=entry.email,
                 subject=subject,
-                template="waitlist_broadcast",
+                template="message",
                 context={
                     "heading": heading,
                     "paragraphs": paragraphs,
@@ -155,3 +155,42 @@ async def send_waitlist_broadcast_task(
 
         await EmailService.finalize_batch(db, batch)
         logger.info("Waitlist broadcast batch %s finished (%d recipients)", batch_id, len(recipients))
+
+
+async def send_admin_message_task(
+    batch_id: uuid.UUID,
+    *,
+    subject: str,
+    heading: str,
+    paragraphs: list[str],
+    emails: list[str],
+) -> None:
+    """Send an admin-composed message to addresses the admin typed by hand."""
+    async with SessionLocal() as db:
+        batch = await db.get(EmailBatch, batch_id)
+        if not batch:
+            logger.warning("Admin message batch %s not found", batch_id)
+            return
+
+        # Re-resolve in the worker so opt-outs that landed between the request and
+        # the send are still honoured.
+        recipients, _skipped = await EmailService.resolve_recipients(db, emails)
+
+        for index, recipient in enumerate(recipients):
+            if index:
+                await _throttle()
+            await EmailService.send(
+                db,
+                category=ADMIN_MESSAGE_CATEGORY,
+                to=recipient.email,
+                subject=subject,
+                template="message",
+                context={"heading": heading, "paragraphs": paragraphs},
+                user_id=recipient.user_id,
+                batch_id=batch.id,
+                opt_out_scope=recipient.opt_out_scope,
+                opt_out_id=recipient.opt_out_id,
+            )
+
+        await EmailService.finalize_batch(db, batch)
+        logger.info("Admin message batch %s finished (%d recipients)", batch_id, len(recipients))

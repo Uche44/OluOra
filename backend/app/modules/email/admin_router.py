@@ -15,8 +15,9 @@ from app.core.config import settings
 from app.core.db import get_db
 from app.dependencies.auth import require_admin
 from app.modules.email import schemas
-from app.modules.email.services import EmailService
+from app.modules.email.services import ADMIN_MESSAGE_CATEGORY, EmailService
 from app.modules.email.tasks import (
+    send_admin_message_task,
     send_feedback_reminders_task,
     send_waitlist_broadcast_task,
 )
@@ -105,16 +106,60 @@ async def admin_feedback_reminders(
 
 
 @router.post(
-    "/waitlist-broadcast",
+    "/broadcast",
     response_model=schemas.QueueResponse,
-    summary="Send a broadcast to the waitlist",
+    summary="Send a composed message to the waitlist or to specific addresses",
 )
-async def admin_waitlist_broadcast(
+async def admin_broadcast(
     payload: schemas.WaitlistBroadcastRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    heading = payload.heading or payload.subject
+    paragraphs = _paragraphs(payload.body)
+
+    # Explicit addresses win: the admin named exactly who should get this, so the
+    # waitlist selection (limit / include_existing_users) does not apply.
+    if payload.recipients:
+        resolved, skipped = await EmailService.resolve_recipients(
+            db, [str(address) for address in payload.recipients]
+        )
+
+        if payload.dry_run:
+            return {
+                "dry_run": True,
+                "recipients": len(resolved),
+                "queued": 0,
+                "batch_id": None,
+                "skipped": len(skipped),
+                "skipped_emails": skipped,
+            }
+
+        batch = await EmailService.create_batch(
+            db,
+            category=ADMIN_MESSAGE_CATEGORY,
+            subject=payload.subject,
+            requested_by=current_user.id,
+            total=len(resolved),
+        )
+        background_tasks.add_task(
+            send_admin_message_task,
+            batch.id,
+            subject=payload.subject,
+            heading=heading,
+            paragraphs=paragraphs,
+            emails=[recipient.email for recipient in resolved],
+        )
+        return {
+            "dry_run": False,
+            "recipients": len(resolved),
+            "queued": len(resolved),
+            "batch_id": batch.id,
+            "skipped": len(skipped),
+            "skipped_emails": skipped,
+        }
+
     limit = _capped_limit(payload.limit)
 
     recipients = await EmailService.waitlist_recipients(
@@ -135,8 +180,8 @@ async def admin_waitlist_broadcast(
         send_waitlist_broadcast_task,
         batch.id,
         subject=payload.subject,
-        heading=payload.heading or payload.subject,
-        paragraphs=_paragraphs(payload.body),
+        heading=heading,
+        paragraphs=paragraphs,
         include_existing_users=payload.include_existing_users,
         limit=limit,
     )

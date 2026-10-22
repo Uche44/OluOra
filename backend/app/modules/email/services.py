@@ -5,6 +5,7 @@ which vendor is configured — that is resolved by ``get_email_provider``.
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
@@ -19,13 +20,25 @@ from app.modules.feedback.models import Feedback
 from app.modules.users.models import User
 from app.modules.waitlist.models import WaitlistEntry
 
-# Categories that carry a one-click unsubscribe link + List-Unsubscribe headers.
-# The signup welcome is transactional (no opt-out link), but still respects
-# User.email_opt_out_at.
-OPT_OUT_CATEGORIES = {"feedback_reminder", "waitlist_welcome", "waitlist_broadcast"}
-
 # Statuses that count as "we already tried to reach this person".
 _ATTEMPTED_STATUSES = ("queued", "sent")
+
+# Category for a message an admin addressed by hand (see admin_router).
+ADMIN_MESSAGE_CATEGORY = "admin_message"
+
+
+@dataclass(slots=True)
+class DirectRecipient:
+    """An address an admin typed by hand, resolved against the database.
+
+    When the address belongs to a user or a waitlist entry we carry that
+    record's id so the message gets a working unsubscribe link.
+    """
+
+    email: str
+    user_id: uuid.UUID | None = None
+    opt_out_scope: str | None = None
+    opt_out_id: uuid.UUID | None = None
 
 
 class EmailService:
@@ -174,6 +187,80 @@ class EmailService:
 
         stmt = stmt.order_by(WaitlistEntry.created_at.asc()).limit(max(1, limit))
         return list((await db.execute(stmt)).scalars().all())
+
+    @staticmethod
+    async def resolve_recipients(
+        db: AsyncSession, emails: list[str]
+    ) -> tuple[list[DirectRecipient], list[str]]:
+        """Resolve admin-typed addresses into sendable recipients.
+
+        Returns ``(recipients, skipped)``. Addresses are de-duplicated
+        case-insensitively and matched against users, then waitlist entries, so a
+        known recipient gets a working unsubscribe link. Anyone who has already
+        opted out is skipped rather than mailed, even when an admin types their
+        address by hand. An address we cannot match is still sent (no opt-out
+        link) since the admin addressed it deliberately.
+        """
+        seen: dict[str, str] = {}
+        for raw in emails:
+            cleaned = (raw or "").strip()
+            if cleaned:
+                seen.setdefault(cleaned.lower(), cleaned)
+
+        if not seen:
+            return [], []
+
+        wanted = list(seen)
+
+        users = (
+            await db.execute(select(User).where(func.lower(User.email).in_(wanted)))
+        ).scalars().all()
+        users_by_email = {user.email.lower(): user for user in users}
+
+        entries = (
+            await db.execute(
+                select(WaitlistEntry).where(func.lower(WaitlistEntry.email).in_(wanted))
+            )
+        ).scalars().all()
+        entries_by_email = {entry.email.lower(): entry for entry in entries}
+
+        recipients: list[DirectRecipient] = []
+        skipped: list[str] = []
+
+        for key, original in seen.items():
+            user = users_by_email.get(key)
+            entry = entries_by_email.get(key)
+
+            # Opt-outs win over an explicit address: never mail someone who
+            # unsubscribed, and tell the admin it happened.
+            if user is not None and user.email_opt_out_at is not None:
+                skipped.append(original)
+                continue
+            if user is None and entry is not None and entry.unsubscribed_at is not None:
+                skipped.append(original)
+                continue
+
+            if user is not None:
+                recipients.append(
+                    DirectRecipient(
+                        email=user.email,
+                        user_id=user.id,
+                        opt_out_scope="user",
+                        opt_out_id=user.id,
+                    )
+                )
+            elif entry is not None:
+                recipients.append(
+                    DirectRecipient(
+                        email=entry.email,
+                        opt_out_scope="waitlist",
+                        opt_out_id=entry.id,
+                    )
+                )
+            else:
+                recipients.append(DirectRecipient(email=original))
+
+        return recipients, skipped
 
     # ------------------------------------------------------------------
     # Batches
