@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="x-apple-disable-message-reformatting">
+    <!-- The design is light-only by intent. Declaring it stops Gmail/Apple Mail
+         from inverting the palette in dark mode and washing out the masthead. -->
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
+    <title>{{ brand_name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400..600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Progressive enhancement only — the same rules are inline below, so a
+           client that ignores this block still gets the intended design. */
+        body { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table { border-collapse: collapse !important; }
+        img { border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+        .ExternalClass { width: 100%; }
+        .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div { line-height: 100%; }
+
+        @media (max-width: 600px) {
+            .wrap { padding: 0 !important; }
+            .sheet { border-radius: 0 !important; border-left: 0 !important; border-right: 0 !important; }
+            .pad { padding-left: 24px !important; padding-right: 24px !important; }
+            .masthead { padding: 16px 24px !important; }
+            .h1 { font-size: 22px !important; line-height: 1.32 !important; }
+            .body-text { font-size: 15px !important; line-height: 1.7 !important; }
+        }
+    </style>
+</head>
+<body style="margin:0;padding:0;background-color:#FCF9F8;">
+    <!-- Inbox preview line. Hidden in the message body itself. -->
+    <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;color:#FCF9F8;">
+        {% block preheader %}{% endblock %}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FCF9F8;">
+        <tr>
+            <td align="center" class="wrap" style="padding:32px 16px;">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="sheet"
+                       style="width:100%;max-width:600px;background-color:#FFFFFF;border:1px solid #E4E2E1;border-radius:16px;overflow:hidden;">
+
+                    <!-- Masthead: the one high-impact brand moment, carrying the mark on deep forest green. -->
+                    <tr>
+                        <td class="masthead" style="background-color:#0B3D2E;padding:24px 32px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td style="vertical-align:middle;padding-right:16px;">
+                                        <img src="{{ logo_url }}" width="32" height="32" alt="{{ brand_name }}" class="logo"
+                                             style="display:block;width:32px;height:32px;border:0;">
+                                    </td>
+                                    <td style="vertical-align:middle;">
+                                        <div style="font-family:'Playfair Display','Didot','Bodoni MT',Georgia,serif;font-size:19px;font-weight:700;line-height:1.1;letter-spacing:0.01em;color:#FFFFFF;">{{ brand_name }}</div>
+                                        <div style="font-family:'Literata',Georgia,'Times New Roman',serif;font-size:10px;font-weight:600;line-height:1.4;letter-spacing:0.18em;text-transform:uppercase;color:#A0D1BC;padding-top:4px;">Audience intelligence</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color:#FED65B;height:2px;line-height:2px;font-size:0;">&nbsp;</td>
+                    </tr>
+
+                    <tr>
+                        <td class="pad" style="padding:40px 40px 32px;">
+                            {% block content %}{% endblock %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="pad" style="padding:0 40px 32px;">
+                            <div style="height:1px;line-height:1px;font-size:0;background-color:#EAE7E7;">&nbsp;</div>
+                            <div style="font-family:'Literata',Georgia,'Times New Roman',serif;font-size:12px;line-height:1.7;color:#717974;padding-top:24px;">
+                                {% block footer_note %}{{ brand_name }}, audience intelligence for creators.{% endblock %}
+                                {% if unsubscribe_url %}<br><a href="{{ unsubscribe_url }}" style="color:#0B3D2E;text-decoration:underline;">Unsubscribe from these emails</a>{% endif %}
+                                <br>{{ mailing_address }}
+                            </div>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

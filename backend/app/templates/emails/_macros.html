@@ -1,0 +1,35 @@
+{#-
+  Type and control macros for OluOra emails.
+
+  Every rule is inlined: most email clients drop or partially apply <style> blocks,
+  and Gmail strips classes on forward. The macros exist only so all four emails
+  speak one system — the rendered HTML is fully inline.
+
+  Spacing sits on the brand's 8-point scale (8/16/24/32/40/48) and colour comes
+  from the docs/frontend-color.md tokens. Names are deliberately distinct from the
+  render context (heading, paragraphs, first_name, …) so a template variable can
+  never shadow a macro.
+-#}
+
+{% macro kicker(text) -%}
+<div style="font-family:'Literata',Georgia,'Times New Roman',serif;font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#735C00;line-height:1.4;padding-bottom:16px;">{{ text }}</div>
+{%- endmacro %}
+
+{% macro headline(text) -%}
+<h1 class="h1" style="margin:0 0 16px;font-family:'Playfair Display','Didot','Bodoni MT',Georgia,serif;font-size:26px;font-weight:700;line-height:1.28;letter-spacing:-0.01em;color:#00261B;">{{ text }}</h1>
+{%- endmacro %}
+
+{% macro para(text) -%}
+<p class="body-text" style="margin:0 0 16px;font-family:'Literata',Georgia,'Times New Roman',serif;font-size:16px;line-height:1.65;color:#414944;">{{ text }}</p>
+{%- endmacro %}
+
+{% macro cta(label, href) -%}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:32px 0 8px;"><tr>
+<td align="center" bgcolor="#0B3D2E" style="background-color:#0B3D2E;border-radius:8px;">
+<a href="{{ href }}" style="display:inline-block;padding:16px 32px;font-family:'Literata',Georgia,'Times New Roman',serif;font-size:14px;font-weight:600;letter-spacing:0.01em;color:#FFFFFF;text-decoration:none;">{{ label }}</a>
+</td></tr></table>
+{%- endmacro %}
+
+{% macro link(label, href) -%}
+<p style="margin:24px 0 0;font-family:'Literata',Georgia,'Times New Roman',serif;font-size:14px;line-height:1.6;"><a href="{{ href }}" style="color:#0B3D2E;text-decoration:underline;">{{ label }}</a></p>
+{%- endmacro %}

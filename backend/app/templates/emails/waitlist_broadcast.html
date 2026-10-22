@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% from "_macros.html" import kicker, headline, para %}
+{% block preheader %}{{ paragraphs[0] if paragraphs else heading }}{% endblock %}
+{% block content %}
+{% if eyebrow %}{{ kicker(eyebrow) }}{% endif %}
+{{ headline(heading) }}
+{% for item in paragraphs %}{{ para(item) }}{% endfor %}
+{% endblock %}
+{% block footer_note %}{{ footer_note or brand_name ~ ", audience intelligence for creators." }}{% endblock %}

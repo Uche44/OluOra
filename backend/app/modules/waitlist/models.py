@@ -31,6 +31,11 @@ class WaitlistEntry(Base):
         String(45),
         nullable=True
     )
+    # Set when the recipient opts out of waitlist emails; excluded from broadcasts.
+    unsubscribed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
 
     def __repr__(self) -> str:
         return f"<WaitlistEntry {self.email}>"

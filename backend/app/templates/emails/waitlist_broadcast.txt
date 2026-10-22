@@ -1,0 +1,8 @@
+{{ heading }}
+
+{% for item in paragraphs %}{{ item }}
+
+{% endfor %}--
+{{ footer_note or brand_name ~ ", audience intelligence for creators." }}
+{% if unsubscribe_url %}Unsubscribe: {{ unsubscribe_url }}
+{% endif %}{{ mailing_address }}

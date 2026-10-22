@@ -69,8 +69,22 @@ Ensure these variables are set in your backend hosting console:
 | `ENVIRONMENT` | Deployment environment | `production` |
 | `DEBUG` | Toggle debug output | `false` |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://user:password@host:port/dbname` |
-| `RESEND_API_KEY` | Resend API key for waitlist emails | `re_...` |
-| `RESEND_FROM_EMAIL` | Deployed/Verified sender address | `hello@mailing.useoluora.xyz` |
+| `EMAIL_PROVIDER` | Active email provider: `resend`, `sendbyte`, or `console` | `resend` |
+| `EMAIL_FROM_NAME` | Display name in the From header | `OluOra` |
+| `EMAIL_LOGO_URL` | Public https URL of the masthead brand mark | `https://www.useoluora.xyz/icons/logo.png` |
+| `EMAIL_FROM_EMAIL` | Verified sender address | `hello@mailing.useoluora.xyz` |
+| `EMAIL_REPLY_TO` | Reply-to address (defaults to the sender) | `hello@mailing.useoluora.xyz` |
+| `FRONTEND_URL` | Public frontend origin, used for links inside emails | `https://www.useoluora.xyz` |
+| `API_PUBLIC_URL` | Public backend origin, used for unsubscribe links | `https://oluora-backend.onrender.com` |
+| `RESEND_API_KEY` | Resend API key (required only when `EMAIL_PROVIDER=resend`) | `re_...` |
+| `RESEND_FROM_EMAIL` | Deployed/Verified sender address (legacy alias) | `hello@mailing.useoluora.xyz` |
+| `SENDBYTE_API_KEY` | Sendbyte Africa key (required only when `EMAIL_PROVIDER=sendbyte`) | `sk_live_...` |
+| `SENDBYTE_BASE_URL` | Sendbyte API base URL | `https://api.sendbyte.africa` |
+| `EMAIL_MAX_PER_SECOND` | Bulk send throttle | `2.0` |
+| `EMAIL_BULK_MAX_PER_RUN` | Hard cap per bulk send run | `200` |
+| `FEEDBACK_REMINDER_MIN_AGE_DAYS` | Account age before a reminder is eligible | `3` |
+| `FEEDBACK_REMINDER_COOLDOWN_DAYS` | Cooldown before re-reminding the same user | `30` |
+| `INTERNAL_CRON_SECRET` | Shared secret for the internal cron endpoint (empty disables it) | *(Generate a random string)* |
 | `CORS_ORIGINS` | Deployed frontend origin (allows CORS queries) | `https://your-frontend.vercel.app` |
 | `JWT_SECRET` | Cryptographic secret for signing JWT cookies | *(Generate a random 32-character hex string)* |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID | `your-google-client-id.apps.googleusercontent.com` |
@@ -87,3 +101,54 @@ If migrations are not run automatically by the server start command:
     ```bash
     alembic upgrade head
     ```
+
+---
+
+## 5. Transactional & Marketing Email
+
+Email is sent through a swappable provider layer (`app/integrations/email/`); the
+vendor is chosen by `EMAIL_PROVIDER`, so switching providers is an env change plus
+a restart — no code change.
+
+- **`resend`** (default) — requires `RESEND_API_KEY` and a verified `EMAIL_FROM_EMAIL`
+  domain.
+- **`sendbyte`** — Sendbyte Africa. Requires `SENDBYTE_API_KEY` and a domain verified
+  in the Sendbyte dashboard. Use a sandbox key (`sk_test_`) to capture mail without
+  delivering it.
+- **`console`** — logs the message and sends nothing. Use this in local dev and CI.
+
+Templates live in `backend/app/templates/emails/` (a shared branded `base.html` plus a
+`.html`/`.txt` pair per email). Every send is logged to `email_messages`, and bulk runs
+to `email_batches`, surfaced in the admin console under **Email**.
+
+### What sends automatically
+
+| Email | Trigger |
+| :--- | :--- |
+| Signup welcome | A new account is created (first Google sign-in) |
+| Waitlist welcome | Someone joins the waitlist |
+| Feedback reminder | Admin-triggered from **Admin → Email** (or the cron endpoint) |
+| Waitlist broadcast | Admin-triggered from **Admin → Email** |
+
+### Bulk sending
+
+Both bulk senders support a dry run (preview the recipient count) before sending.
+Sends are throttled to `EMAIL_MAX_PER_SECOND` and capped at `EMAIL_BULK_MAX_PER_RUN`
+per run so a single blast cannot exhaust the provider's daily quota. Marketing emails
+carry a signed one-click unsubscribe link and `List-Unsubscribe` headers; recipients who
+opt out are excluded from future sends.
+
+### Driving reminders from an external cron
+
+Set `INTERNAL_CRON_SECRET`, then have a scheduler (Railway cron, GitHub Actions,
+cron-job.org) call the secured endpoint:
+
+```bash
+curl -X POST "https://your-backend/api/v1/internal/email/run" \
+  -H "X-Internal-Secret: $INTERNAL_CRON_SECRET"
+```
+
+The endpoint returns `503` when `INTERNAL_CRON_SECRET` is empty (disabled) and `401`
+on a wrong secret. Nothing depends on the cron being wired — the admin button calls the
+same service.
+

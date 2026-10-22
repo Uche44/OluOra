@@ -20,4 +20,6 @@ scikit-learn>=1.4.0
 numpy>=1.26.0
 groq>=0.9.0
 textblob>=0.18.0
+# Email templating (see app/modules/email + app/templates/emails)
+jinja2>=3.1.4
 

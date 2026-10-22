@@ -20,6 +20,8 @@ class User(Base):
     # Login identity. Data-platform connections live in SocialAccount.
     auth_provider: Mapped[str] = mapped_column(String(50), default="google", nullable=False)
     auth_provider_id: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    # Set when the user opts out of non-transactional emails (e.g. feedback reminders).
+    email_opt_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 

@@ -2,7 +2,7 @@ import uuid
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import create_access_token, create_refresh_token
 from app.dependencies.auth import get_current_user, require_tiktok_beta
+from app.modules.email.tasks import send_signup_welcome_task
 from app.modules.users.models import User, SocialAccount
 from app.modules.users.schemas import UserResponse
 from app.modules.users import token_service
@@ -133,7 +134,11 @@ async def get_google_url(client: str | None = None):
     return {"url": url, "state": state}
 
 @router.post("/google/callback", response_model=TokenResponse, summary="Process Google sign-in callback")
-async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depends(get_db)):
+async def google_callback(
+    payload: GoogleLoginRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
     """Processes the callback code, upserts the user account, and issues OluOra JWTs."""
     # 0. Verify the OAuth state token to prevent login CSRF (forged/reused flows).
     state_payload = verify_oauth_state(payload.state, providers.FLOW_LOGIN)
@@ -202,6 +207,10 @@ async def google_callback(payload: GoogleLoginRequest, db: AsyncSession = Depend
         await db.commit()
         await db.refresh(user)
         logger.info(f"Created new user account: {email}")
+
+        # Send the welcome email once, only for brand-new accounts (never on a
+        # returning login). Enqueued so the OAuth callback stays fast.
+        background_tasks.add_task(send_signup_welcome_task, user.id)
     else:
         user.full_name = name
         user.profile_picture = picture

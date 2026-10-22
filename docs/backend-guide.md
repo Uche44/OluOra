@@ -468,8 +468,12 @@ Examples:
 
 * Comment imports
 * AI analysis
-* Email sending
 * Report generation
+
+Email sending is already handled this way: sends are enqueued with FastAPI
+`BackgroundTasks` and executed by `app/modules/email/tasks.py`, which opens its own
+session, so a slow provider never blocks a request. The provider itself is
+vendor-agnostic (`app/integrations/email/`, selected by `EMAIL_PROVIDER`).
 
 API endpoints should remain responsive.
 

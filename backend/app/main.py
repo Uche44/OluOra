@@ -13,6 +13,7 @@ from app.modules.youtube.models import Channel, Video
 from app.modules.comments.models import Comment
 from app.modules.analysis.models import Analysis, TopicCluster, Insight, AnalysisJob
 from app.modules.feedback.models import Feedback
+from app.modules.email.models import EmailBatch, EmailMessage
 from app.modules.admin.services import sync_admin_flags
 
 logger = logging.getLogger(__name__)

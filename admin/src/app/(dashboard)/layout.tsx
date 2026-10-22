@@ -12,6 +12,7 @@ import {
   Activity,
   Server,
   MessageSquare,
+  Mail,
   LogOut,
   Menu,
   X,
@@ -25,6 +26,7 @@ const navItems = [
   { label: "Users", href: "/users", icon: Users },
   { label: "Waitlist", href: "/waitlist", icon: ClipboardList },
   { label: "Feedback", href: "/feedback", icon: MessageSquare },
+  { label: "Email", href: "/email", icon: Mail },
   { label: "API Usage", href: "/usage", icon: Activity },
   { label: "Job Health", href: "/jobs", icon: Server },
 ];

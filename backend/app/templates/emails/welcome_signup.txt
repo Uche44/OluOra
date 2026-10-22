@@ -1,0 +1,16 @@
+Welcome to OluOra{% if first_name %}, {{ first_name }}{% endif %}
+
+You're in. OluOra reads the comment sections on your YouTube and TikTok videos
+and turns them into editorial direction: what your audience keeps asking for,
+and what to make next.
+
+Start by connecting a channel. We pull in your videos, and you choose which ones
+to analyse, so your effort always lands where it counts.
+
+Open your dashboard:
+{{ dashboard_url }}
+
+--
+OluOra, audience intelligence for creators.
+{% if unsubscribe_url %}Unsubscribe: {{ unsubscribe_url }}
+{% endif %}{{ mailing_address }}

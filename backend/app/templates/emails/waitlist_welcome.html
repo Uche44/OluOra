@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% from "_macros.html" import kicker, headline, para, link %}
+{% block preheader %}We'll email you the moment your invite is ready.{% endblock %}
+{% block content %}
+{{ kicker("Waitlist") }}
+{{ headline("You're on the OluOra waitlist") }}
+{{ para("Thanks for asking for early access. We're building audience intelligence for professional creators: reading comment sections at scale and distilling them into clear, editorial direction.") }}
+{{ para("Your invite is not ready yet. We'll email you the moment it is.") }}
+{{ link("See what OluOra does", frontend_url) }}
+{% endblock %}
+{% block footer_note %}If you did not join the OluOra waitlist, you can ignore this email.{% endblock %}

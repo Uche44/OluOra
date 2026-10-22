@@ -87,7 +87,7 @@ All architecture, API design, and design system documentation lives in the [`doc
 | Backend | FastAPI, SQLAlchemy 2, Alembic, Pydantic v2 |
 | Database | PostgreSQL + pgvector |
 | AI | Groq API (open-weight GPT-OSS models) · OpenAI-compatible |
-| Email | Sendbyte Africa |
+| Email | Resend (default) · Sendbyte Africa · swappable via `EMAIL_PROVIDER` |
 | Deployment | Vercel (frontend) · Railway (backend) · Neon (database) |
 
 ---

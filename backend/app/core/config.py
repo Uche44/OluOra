@@ -28,9 +28,49 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
 
-    # Resend API
-    RESEND_API_KEY: str
-    RESEND_FROM_EMAIL: str
+    # ---------------------------------------------------------------------
+    # Email
+    # ---------------------------------------------------------------------
+    # Active email provider. Swappable so the app is not locked to a vendor:
+    #   "resend"   -> Resend HTTP API (default)
+    #   "sendbyte" -> Sendbyte Africa
+    #   "console"  -> log-only, no network (dev/tests)
+    EMAIL_PROVIDER: str = "resend"
+    # Display name used in the From header ("OluOra <hello@...>").
+    EMAIL_FROM_NAME: str = "OluOra"
+    # Absolute https URL of the brand mark shown in email headers. Email clients
+    # fetch images server-side, so this must be publicly reachable — a localhost
+    # or relative URL renders as a broken image.
+    EMAIL_LOGO_URL: str = "https://www.useoluora.xyz/icons/logo.png"
+    # Sender address. Falls back to RESEND_FROM_EMAIL for backwards compatibility.
+    EMAIL_FROM_EMAIL: str = ""
+    # Where replies should go. Defaults to the sender address when empty.
+    EMAIL_REPLY_TO: str = ""
+    # Public origin of the creator app, used to build links inside emails.
+    FRONTEND_URL: str = "http://localhost:3000"
+    # Public origin of this API, used to build links that hit backend routes
+    # directly (e.g. one-click unsubscribe).
+    API_PUBLIC_URL: str = "http://localhost:8000"
+
+    # Resend API (optional: only required when EMAIL_PROVIDER=resend)
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = ""
+
+    # Sendbyte Africa (https://sendbyte.africa) — only used when EMAIL_PROVIDER=sendbyte
+    SENDBYTE_API_KEY: str = ""
+    SENDBYTE_BASE_URL: str = "https://api.sendbyte.africa"
+
+    # Shared secret guarding the internal cron endpoint. Empty disables it.
+    INTERNAL_CRON_SECRET: str = ""
+
+    # Bulk-send behaviour. Caps exist to respect provider rate limits and daily quotas.
+    EMAIL_MAX_PER_SECOND: float = 2.0
+    EMAIL_BULK_MAX_PER_RUN: int = 200
+
+    # Feedback reminders: minimum account age before a reminder is eligible, and
+    # how long before the same user can be reminded again.
+    FEEDBACK_REMINDER_MIN_AGE_DAYS: int = 3
+    FEEDBACK_REMINDER_COOLDOWN_DAYS: int = 30
 
     # Google OAuth
     GOOGLE_CLIENT_ID: str
@@ -95,6 +135,16 @@ class Settings(BaseSettings):
     def tiktok_beta_emails_list(self) -> List[str]:
         # Normalized lowercase for case-insensitive email matching.
         return [i.strip().lower() for i in self.TIKTOK_BETA_EMAILS.split(",") if i.strip()]
+
+    @property
+    def email_from_address(self) -> str:
+        # EMAIL_FROM_EMAIL is the new field; fall back to the legacy RESEND_FROM_EMAIL
+        # so existing deployments keep working without renaming the env var.
+        return self.EMAIL_FROM_EMAIL or self.RESEND_FROM_EMAIL
+
+    @property
+    def email_reply_to_address(self) -> str:
+        return self.EMAIL_REPLY_TO or self.email_from_address
 
 settings = Settings()
 

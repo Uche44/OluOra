@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% from "_macros.html" import kicker, headline, para, cta %}
+{% block preheader %}One minute of your time shapes what we build next.{% endblock %}
+{% block content %}
+{{ kicker("Feedback") }}
+{{ headline("How's OluOra working for you" ~ (", " ~ first_name if first_name else "") ~ "?") }}
+{{ para("You've had your account for a while now, and we'd like to know how it's going. If something is confusing, a feature is missing, or an insight helped you decide what to make next, tell us.") }}
+{{ para("It takes under a minute. The feedback button sits in the corner of your dashboard.") }}
+{{ cta("Leave feedback", feedback_url) }}
+{% endblock %}
+{% block footer_note %}You're receiving this because you have an OluOra account.{% endblock %}

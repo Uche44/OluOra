@@ -1,0 +1,14 @@
+How's OluOra working for you{% if first_name %}, {{ first_name }}{% endif %}?
+
+You've had your account for a while now, and we'd like to know how it's going.
+If something is confusing, a feature is missing, or an insight helped you decide
+what to make next, tell us.
+
+It takes under a minute. The feedback button sits in the corner of your dashboard:
+
+{{ feedback_url }}
+
+--
+You're receiving this because you have an OluOra account.
+{% if unsubscribe_url %}Unsubscribe: {{ unsubscribe_url }}
+{% endif %}{{ mailing_address }}

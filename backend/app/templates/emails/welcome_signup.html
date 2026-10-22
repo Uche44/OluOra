@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% from "_macros.html" import kicker, headline, para, cta %}
+{% block preheader %}Connect a channel and turn your comments into editorial direction.{% endblock %}
+{% block content %}
+{{ kicker("Welcome") }}
+{{ headline("Welcome to OluOra" ~ (", " ~ first_name if first_name else "")) }}
+{{ para("You're in. OluOra reads the comment sections on your YouTube and TikTok videos and turns them into editorial direction: what your audience keeps asking for, and what to make next.") }}
+{{ para("Start by connecting a channel. We import your videos, and you choose which ones to analyse, so the effort you spend always lands where it counts.") }}
+{{ cta("Open your dashboard", dashboard_url) }}
+{% endblock %}

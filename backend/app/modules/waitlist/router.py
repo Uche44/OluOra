@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
+from app.modules.email.tasks import send_waitlist_welcome_task
 from app.modules.waitlist.schemas import WaitlistEntryCreate, WaitlistEntryResponse
 from app.modules.waitlist.services import WaitlistService
 
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/waitlist", tags=["Waitlist"])
 async def join_waitlist(
     payload: WaitlistEntryCreate,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
     # Try to resolve user's real IP address from proxy headers if behind load balancers
@@ -29,6 +31,11 @@ async def join_waitlist(
         email=payload.email,
         ip_address=ip_address
     )
+
+    # Send the confirmation email after the response, so a slow provider never
+    # blocks the signup request.
+    background_tasks.add_task(send_waitlist_welcome_task, entry.id)
+
     return entry
 
 @router.get(

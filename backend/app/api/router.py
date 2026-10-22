@@ -8,6 +8,9 @@ from app.modules.comments.router import router as comments_router
 from app.modules.analysis.router import router as analysis_router
 from app.modules.admin.router import router as admin_router
 from app.modules.feedback.router import router as feedback_router
+from app.modules.email.router import router as email_router
+from app.modules.email.admin_router import router as email_admin_router
+from app.modules.email.internal_router import router as email_internal_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -22,3 +25,6 @@ api_router.include_router(comments_router)
 api_router.include_router(analysis_router)
 api_router.include_router(admin_router)
 api_router.include_router(feedback_router)
+api_router.include_router(email_router)
+api_router.include_router(email_admin_router)
+api_router.include_router(email_internal_router)
