@@ -110,6 +110,13 @@ class Settings(BaseSettings):
     HF_API_KEY: str = ""
     HF_EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
 
+    # Analysis sampling. Each cluster sends up to this many diverse comments to
+    # the LLM (previously only 5 centroid-nearest comments were used).
+    ANALYSIS_SAMPLES_PER_CLUSTER: int = 20
+    # Large clusters are split into this many sub-groups before sampling so
+    # internal sub-themes are represented, not just the cluster centroid.
+    ANALYSIS_SUBCLUSTERS: int = 6
+
     # CORS Origins (comma-separated string in env)
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
 

@@ -19,7 +19,13 @@ from app.modules.waitlist.models import WaitlistEntry
 from app.modules.users.models import User, SocialAccount, ApiQuotaUsage
 from app.modules.youtube.models import Channel, Video
 from app.modules.comments.models import Comment
-from app.modules.analysis.models import Analysis, TopicCluster, Insight, AnalysisJob
+from app.modules.analysis.models import (
+    Analysis,
+    TopicCluster,
+    Insight,
+    AnalysisJob,
+    CommentClusterMembership,
+)
 from app.modules.feedback.models import Feedback
 from app.modules.email.models import EmailBatch, EmailMessage
 

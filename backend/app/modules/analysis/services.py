@@ -6,8 +6,16 @@ import uuid
 from datetime import datetime, timezone
 import logging
 import numpy as np
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.config import settings
+from app.modules.analysis.models import (
+    Analysis,
+    AnalysisJob,
+    CommentClusterMembership,
+    Insight,
+    TopicCluster,
+)
 from app.modules.comments.models import Comment
 from app.modules.comments.preprocessing import clean_comment_text
 from app.integrations.huggingface import generate_embeddings
@@ -137,12 +145,13 @@ async def cluster_comments_for_analysis(
 
     1. Fetches all comments for the video that have embeddings.
     2. Runs local KMeans clustering (via run_in_threadpool).
-    3. Finds representative comments closest to the centroid of each cluster.
-    4. Creates TopicCluster database records.
-    5. Associates comments to their respective TopicCluster.
+    3. Creates TopicCluster database records.
+    4. Records per-run membership in CommentClusterMembership.
+
+    Membership is scoped to ``analysis_id`` so re-running analysis never
+    rewrites the output of earlier runs.
     """
     from fastapi.concurrency import run_in_threadpool
-    from app.modules.analysis.models import TopicCluster
 
     # 1. Fetch comments with embeddings
     result = await db.execute(
@@ -156,6 +165,12 @@ async def cluster_comments_for_analysis(
     if not comments:
         logger.warning(f"No comments found with embeddings for video_id={video_id}")
         return 0
+
+    # Clear any partial output from a previous attempt of *this* analysis. The
+    # delete cascades to memberships; other analyses are untouched.
+    await db.execute(
+        delete(TopicCluster).where(TopicCluster.analysis_id == analysis_id)
+    )
 
     # Determine dynamic k (number of clusters)
     k = min(num_clusters, len(comments))
@@ -186,16 +201,16 @@ async def cluster_comments_for_analysis(
         sentiments = [c.sentiment_score for c in cluster_comments if c.sentiment_score is not None]
         avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0.0
 
-        # Calculate distances to centroid to find representative comments
+        # Calculate distances to the centroid; these become part of the
+        # immutable membership record and drive the preliminary summary.
         centroid = centroids[cluster_idx]
         comment_distances = []
         for c in cluster_comments:
             dist = float(np.linalg.norm(np.array(c.embedding, dtype=np.float32) - centroid))
             comment_distances.append((c, dist))
 
-        # Sort by distance (closest first)
         comment_distances.sort(key=lambda x: x[1])
-        top_reps = [item[0] for item in comment_distances[:5]]  # Top 5 representatives
+        top_reps = [item[0] for item in comment_distances[:5]]
 
         # Create a preliminary summary (snippets of top representatives)
         rep_texts = [f"- {c.author_name}: {c.text[:120]}" for c in top_reps]
@@ -212,34 +227,170 @@ async def cluster_comments_for_analysis(
         db.add(cluster_record)
         await db.flush()  # To populate cluster_record.id
 
-        # 5. Link comments to the cluster in DB
-        for c in cluster_comments:
-            c.topic_cluster_id = cluster_record.id
+        # 5. Record this run's membership in the per-analysis join table.
+        for c, dist in comment_distances:
+            db.add(
+                CommentClusterMembership(
+                    analysis_id=analysis_id,
+                    cluster_id=cluster_record.id,
+                    comment_id=c.id,
+                    distance=dist,
+                )
+            )
 
     await db.commit()
     logger.info(f"Successfully created {k} clusters for analysis_id={analysis_id}")
     return k
 
 
-def _get_representative_comments(comments: list[Comment], limit: int = 5) -> list[Comment]:
-    """Helper to find representative comments closest to the mean vector of comments."""
-    if not comments:
+def _dedupe_comments(comments: list[Comment]) -> list[Comment]:
+    """Drop exact/normalized duplicates without touching the database."""
+    seen: set[str] = set()
+    unique: list[Comment] = []
+    for comment in comments:
+        key = (comment.text or "").strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(comment)
+    return unique
+
+
+def _diverse_sample(comments: list[Comment], limit: int) -> list[Comment]:
+    """Pick comments that are typical, engaging, and mutually diverse.
+
+    Starts from the comment nearest the centroid, adds the most-liked comments,
+    then uses farthest-first traversal so distinct sub-themes inside the cluster
+    are represented instead of five near-identical centroid neighbours.
+    """
+    if limit <= 0 or not comments:
         return []
-    embedded_comments = [c for c in comments if c.embedding is not None]
-    if not embedded_comments:
-        return comments[:limit]
+    if len(comments) <= limit:
+        return list(comments)
 
-    # Convert embeddings to numpy array
-    embeddings = np.array([c.embedding for c in embedded_comments], dtype=np.float32)
-    # Calculate centroid
-    centroid = np.mean(embeddings, axis=0)
-    # Calculate Euclidean distances to centroid
-    distances = np.linalg.norm(embeddings - centroid, axis=1)
+    embedded = [c for c in comments if c.embedding is not None]
+    if len(embedded) <= limit:
+        return embedded
 
-    paired = list(zip(embedded_comments, distances))
-    paired.sort(key=lambda x: x[1])  # Sort by distance ascending
+    emb = np.array([c.embedding for c in embedded], dtype=np.float32)
+    centroid = emb.mean(axis=0)
+    d_centroid = np.linalg.norm(emb - centroid, axis=1)
 
-    return [p[0] for p in paired[:limit]]
+    chosen: list[int] = [int(np.argmin(d_centroid))]
+
+    # Seed with the most-liked comments (what the audience actually resonated
+    # with) up to ~20% of the sample budget.
+    engagement_budget = max(1, limit // 5)
+    by_likes = sorted(
+        range(len(embedded)),
+        key=lambda i: embedded[i].like_count or 0,
+        reverse=True,
+    )
+    for i in by_likes[:engagement_budget]:
+        if i not in chosen:
+            chosen.append(i)
+        if len(chosen) >= limit:
+            break
+
+    # Farthest-first traversal; O(n) memory per step.
+    dmin = np.linalg.norm(emb - emb[chosen[0]], axis=1)
+    for i in chosen[1:]:
+        dmin = np.minimum(dmin, np.linalg.norm(emb - emb[i], axis=1))
+    while len(chosen) < limit:
+        mask = np.ones(len(embedded), dtype=bool)
+        mask[chosen] = False
+        candidates = np.where(mask)[0]
+        if candidates.size == 0:
+            break
+        nxt = int(candidates[np.argmax(dmin[candidates])])
+        chosen.append(nxt)
+        dmin = np.minimum(dmin, np.linalg.norm(emb - emb[nxt], axis=1))
+
+    return [embedded[i] for i in chosen[:limit]]
+
+
+def _subcluster_sample(comments: list[Comment], limit: int) -> list[Comment]:
+    """Split a large cluster into sub-groups, then sample each group.
+
+    A single centroid sample can miss minority themes hidden inside a large
+    cluster; sub-clustering forces coverage of each internal region.
+    """
+    embedded = [c for c in comments if c.embedding is not None]
+    if len(embedded) <= limit:
+        return embedded
+
+    from sklearn.cluster import KMeans
+
+    n_sub = max(1, min(settings.ANALYSIS_SUBCLUSTERS, len(embedded)))
+    emb = np.array([c.embedding for c in embedded], dtype=np.float32)
+    labels = KMeans(n_clusters=n_sub, random_state=42, n_init="auto").fit_predict(emb)
+
+    per_sub = max(1, int(np.ceil(limit / n_sub)))
+    chosen: list[Comment] = []
+    chosen_ids: set[uuid.UUID] = set()
+
+    for label in range(n_sub):
+        group = [c for c, c_label in zip(embedded, labels) if c_label == label]
+        for comment in _diverse_sample(group, per_sub):
+            if comment.id not in chosen_ids:
+                chosen_ids.add(comment.id)
+                chosen.append(comment)
+
+    # Rounding can leave the sample short; fill from the whole cluster.
+    if len(chosen) < limit:
+        for comment in _diverse_sample(embedded, limit):
+            if comment.id not in chosen_ids:
+                chosen_ids.add(comment.id)
+                chosen.append(comment)
+            if len(chosen) >= limit:
+                break
+
+    return chosen[:limit]
+
+
+def _select_cluster_samples(comments: list[Comment], limit: int) -> list[Comment]:
+    """Return a deduplicated, diverse sample of at most ``limit`` comments."""
+    unique = _dedupe_comments(comments)
+    if len(unique) <= limit:
+        return unique
+    if len(unique) >= limit * 4:
+        return _subcluster_sample(unique, limit)
+    return _diverse_sample(unique, limit)
+
+
+def _cluster_digest(comments: list[Comment], top_n: int = 8) -> dict:
+    """Cheap signals computed over *all* comments in a cluster.
+
+    These supplement the sampled comments, so the model still sees aggregate
+    evidence from comments that were not included in the prompt.
+    """
+    texts = [(c.text or "").strip() for c in comments if (c.text or "").strip()]
+    total = len(comments)
+    question_count = sum(1 for text in texts if "?" in text)
+
+    terms: list[str] = []
+    if len(texts) >= 5:
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+
+            vectorizer = TfidfVectorizer(
+                stop_words="english",
+                ngram_range=(1, 2),
+                max_features=200,
+            )
+            matrix = vectorizer.fit_transform(texts)
+            scores = np.asarray(matrix.mean(axis=0)).ravel()
+            names = vectorizer.get_feature_names_out()
+            terms = [str(names[i]) for i in np.argsort(scores)[-top_n:][::-1]]
+        except Exception:
+            terms = []
+
+    return {
+        "total": total,
+        "question_count": question_count,
+        "question_ratio": question_count / total if total else 0.0,
+        "top_terms": terms,
+    }
 
 
 async def generate_insights_for_analysis(
@@ -252,7 +403,7 @@ async def generate_insights_for_analysis(
     and extract structured audience insights (questions, pain points, recommendations).
     """
     import json
-    from app.modules.analysis.models import Analysis, TopicCluster, Insight
+    from fastapi.concurrency import run_in_threadpool
 
     # Fetch the analysis record
     result = await db.execute(
@@ -266,6 +417,12 @@ async def generate_insights_for_analysis(
     await db.commit()
 
     try:
+        # 0. Clear insights from a previous attempt of *this* run so retries are
+        #    idempotent. Other analyses keep their own immutable output.
+        await db.execute(
+            delete(Insight).where(Insight.analysis_id == analysis_id)
+        )
+
         # 1. Fetch clusters
         result = await db.execute(
             select(TopicCluster).where(TopicCluster.analysis_id == analysis_id)
@@ -275,22 +432,45 @@ async def generate_insights_for_analysis(
         if not clusters:
             raise ValueError(f"No topic clusters found for analysis_id={analysis_id}")
 
-        # 2. Format cluster blocks for prompt
+        # 2. Fetch this run's comment membership in one query (avoids N+1) and
+        #    group it by cluster. Membership is scoped by analysis_id, so earlier
+        #    runs are never affected by a re-run.
+        membership_result = await db.execute(
+            select(CommentClusterMembership.cluster_id, CommentClusterMembership.distance, Comment)
+            .join(Comment, Comment.id == CommentClusterMembership.comment_id)
+            .where(CommentClusterMembership.analysis_id == analysis_id)
+        )
+        comments_by_cluster: dict[uuid.UUID, list[tuple[Comment, float | None]]] = {}
+        for cluster_id, distance, comment in membership_result.all():
+            comments_by_cluster.setdefault(cluster_id, []).append((comment, distance))
+
+        # 3. Format cluster blocks for the prompt. Each cluster sends a diverse
+        #    sample plus a digest computed over every comment in the cluster.
         cluster_blocks = []
         for idx, cluster in enumerate(clusters):
-            # Fetch comments in this cluster
-            c_result = await db.execute(
-                select(Comment).where(Comment.topic_cluster_id == cluster.id)
+            pairs = comments_by_cluster.get(cluster.id, [])
+            # Central comments first; the distance is preserved from clustering.
+            pairs.sort(key=lambda pair: (pair[1] is None, pair[1] or 0.0))
+            cluster_comments = [comment for comment, _ in pairs]
+
+            digest = await run_in_threadpool(_cluster_digest, cluster_comments)
+            samples = await run_in_threadpool(
+                _select_cluster_samples,
+                cluster_comments,
+                settings.ANALYSIS_SAMPLES_PER_CLUSTER,
             )
-            cluster_comments = c_result.scalars().all()
-            reps = _get_representative_comments(cluster_comments, limit=5)
-            rep_lines = "\n".join(f"- {c.author_name}: {c.text}" for c in reps)
+            rep_lines = "\n".join(
+                f"- {c.author_name}: {c.text}" for c in samples
+            ) or "- (no comments captured for this group)"
 
             block = (
-                f"GROUP {idx + 1}:\n"
-                f"Size: {cluster.size} comments\n"
-                f"Average Sentiment: {cluster.sentiment_score:.2f}\n"
-                f"Representative Comments:\n{rep_lines}\n"
+                f"GROUP {idx + 1} (cluster_id: {cluster.id}):\n"
+                f"Total comments in group: {cluster.size}\n"
+                f"Analyzed sample: {len(samples)} diverse comments\n"
+                f"Average sentiment: {cluster.sentiment_score:.2f}\n"
+                f"Questions in sample: {digest['question_count']}/{len(cluster_comments)}\n"
+                f"Top terms across all comments: {', '.join(digest['top_terms']) or 'n/a'}\n"
+                f"Sample comments:\n{rep_lines}\n"
             )
             cluster_blocks.append(block)
 
@@ -310,6 +490,7 @@ async def generate_insights_for_analysis(
             "{\n"
             '  "topic_clusters": [\n'
             "    {\n"
+            '      "cluster_id": "The cluster_id exactly as given for the group",\n'
             '      "name": "Short plain-English topic name (max 5 words)",\n'
             '      "description": "1-2 simple sentences describing what viewers in this group are saying."\n'
             "    }\n"
@@ -343,8 +524,11 @@ async def generate_insights_for_analysis(
 
         user_prompt = (
             f"Analyze these groups of viewer comments from a video:\n\n{cluster_data}\n\n"
+            "Each group includes its cluster_id, its total size, and a diverse sample of "
+            "its comments. Treat the sample as evidence of the whole group.\n"
             "Return a JSON object containing:\n"
-            "1. Simple plain-English names and descriptions for each group in 'topic_clusters', matching the order and count of the input groups.\n"
+            "1. Plain-English names and descriptions for each group in 'topic_clusters'. "
+            "Echo the exact 'cluster_id' for every group; do not invent IDs or omit groups.\n"
             "2. The top recurring questions viewers are asking ('top_questions').\n"
             "3. Key things frustrating or confusing viewers ('pain_points').\n"
             "4. The most common things viewers are praising ('positive_themes').\n"
@@ -378,12 +562,22 @@ async def generate_insights_for_analysis(
             )
             data = _generate_local_fallback_insights(clusters)
 
-        # 6. Update TopicClusters in DB
+        # 6. Update TopicClusters in DB. Prefer the echoed cluster_id; fall back
+        #    to positional matching for models that ignore the ID instruction.
         llm_clusters = data.get("topic_clusters", [])
+        by_id = {
+            str(item.get("cluster_id")): item
+            for item in llm_clusters
+            if item.get("cluster_id")
+        }
         for idx, cluster in enumerate(clusters):
-            if idx < len(llm_clusters):
-                cluster.title = llm_clusters[idx].get("name", cluster.title)
-                cluster.summary = llm_clusters[idx].get("description", cluster.summary)
+            if by_id:
+                match = by_id.get(str(cluster.id))
+            else:
+                match = llm_clusters[idx] if idx < len(llm_clusters) else None
+            if match:
+                cluster.title = match.get("name", cluster.title)
+                cluster.summary = match.get("description", cluster.summary)
 
         # 7. Create Insight records
         insight_mappings = [
@@ -503,14 +697,14 @@ async def run_queued_analysis_job(
             logger.info(f"Generating insights for analysis {analysis_id} in background queue...")
             await generate_insights_for_analysis(db, analysis_id, video_id)
 
-            # Update final comments analyzed count
-            total_embedded_result = await db.execute(
-                select(func.count()).select_from(Comment).where(
-                    Comment.video_id == video_id,
-                    Comment.embedding.is_not(None)
+            # Update final comments analyzed count for *this run*. Counting all
+            # embedded comments on the video would include earlier analyses.
+            total_analyzed_result = await db.execute(
+                select(func.count()).select_from(CommentClusterMembership).where(
+                    CommentClusterMembership.analysis_id == analysis_id
                 )
             )
-            total_analyzed = total_embedded_result.scalar() or 0
+            total_analyzed = total_analyzed_result.scalar() or 0
 
             # Re-fetch records inside session to update safely
             job_stmt = select(AnalysisJob).where(AnalysisJob.id == job_id)

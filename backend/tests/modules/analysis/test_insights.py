@@ -3,6 +3,7 @@ import pytest
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 from app.modules.analysis.models import Analysis, TopicCluster
+from app.modules.comments.models import Comment
 
 
 @pytest.mark.asyncio
@@ -25,25 +26,39 @@ async def test_generate_insights_successful():
     mock_cluster.size = 10
     mock_cluster.sentiment_score = 0.5
 
+    # Mock a member comment for this run
+    mock_comment = MagicMock(spec=Comment)
+    mock_comment.id = uuid.uuid4()
+    mock_comment.author_name = "Alice"
+    mock_comment.text = "How much does the pro plan cost?"
+    mock_comment.like_count = 7
+    mock_comment.embedding = [0.1] * 384
+
     mock_db = AsyncMock()
     
     # We execute:
     # 1. Fetch analysis
-    # 2. Fetch clusters
-    # 3. Fetch comments in the cluster (for _get_representative_comments)
+    # 2. Delete previous insights for this run (idempotent retry)
+    # 3. Fetch clusters
+    # 4. Fetch comment memberships for this analysis
     mock_result_analysis = MagicMock()
     mock_result_analysis.scalars.return_value.first.return_value = mock_analysis
-    
+
+    mock_result_delete = MagicMock()
+
     mock_result_clusters = MagicMock()
     mock_result_clusters.scalars.return_value.all.return_value = [mock_cluster]
 
-    mock_result_comments = MagicMock()
-    mock_result_comments.scalars.return_value.all.return_value = [] # no comments for representatives helper, falls back
+    mock_result_memberships = MagicMock()
+    mock_result_memberships.all.return_value = [
+        (mock_cluster.id, 0.25, mock_comment)
+    ]
 
     mock_db.execute.side_effect = [
         mock_result_analysis,
+        mock_result_delete,
         mock_result_clusters,
-        mock_result_comments
+        mock_result_memberships,
     ]
 
     added_insights = []
@@ -101,6 +116,12 @@ async def test_generate_insights_successful():
         assert result_data == mock_json_response
         mock_llm_call.assert_called_once()
         mock_db.commit.assert_called()
+
+        # The prompt must include this run's cluster id and the sampled comments.
+        prompt = mock_llm_call.call_args.kwargs["prompt"]
+        assert f"cluster_id: {mock_cluster.id}" in prompt
+        assert "Sample comments:" in prompt
+        assert mock_comment.text in prompt
 
         # Verify cluster re-labeling
         assert mock_cluster.title == "New Re-labeled Title"

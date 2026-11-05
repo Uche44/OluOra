@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Integer, Text, Float, DateTime, ForeignKey
+from sqlalchemy import String, Integer, Text, Float, DateTime, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db import Base
@@ -39,7 +39,13 @@ class TopicCluster(Base):
 
     # Relationships
     analysis: Mapped["Analysis"] = relationship("Analysis", back_populates="topic_clusters")
-    comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="topic_cluster")
+    # Historical membership lives in CommentClusterMembership; the legacy
+    # `comments.topic_cluster_id` column was removed after backfilling.
+    memberships: Mapped[list["CommentClusterMembership"]] = relationship(
+        "CommentClusterMembership",
+        back_populates="cluster",
+        cascade="all, delete-orphan",
+    )
 
 class Insight(Base):
     __tablename__ = "insights"
@@ -53,6 +59,42 @@ class Insight(Base):
 
     # Relationships
     analysis: Mapped["Analysis"] = relationship("Analysis", back_populates="insights")
+
+
+class CommentClusterMembership(Base):
+    """The cluster a comment landed in for one specific analysis run.
+
+    Membership used to be a single mutable FK on ``Comment``, so re-running an
+    analysis overwrote it and corrupted the history of earlier runs. Scoping the
+    relation by ``analysis_id`` makes each run's output immutable.
+    """
+
+    __tablename__ = "comment_cluster_memberships"
+    __table_args__ = (
+        UniqueConstraint("analysis_id", "comment_id", name="uq_ccm_analysis_comment"),
+        Index("ix_ccm_analysis_cluster", "analysis_id", "cluster_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("analyses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    cluster_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("topic_clusters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    comment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("comments.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Distance to the cluster centroid. Useful for finding the most central
+    # comments later without re-running clustering.
+    distance: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    # Relationships
+    cluster: Mapped["TopicCluster"] = relationship("TopicCluster", back_populates="memberships")
+    comment: Mapped["Comment"] = relationship("Comment", back_populates="cluster_memberships")
 
 
 class AnalysisJob(Base):
