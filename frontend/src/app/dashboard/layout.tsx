@@ -7,8 +7,8 @@ import Image from "next/image";
 import {
   LayoutGrid,
   Film,
-  Lightbulb,
   Sparkles,
+  Calendar,
   Settings,
   Crown,
   HelpCircle,
@@ -68,18 +68,14 @@ export default function DashboardLayout({
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
     { label: "Videos", href: "/dashboard/videos", icon: Film },
-    { label: "Insights", href: "/dashboard/insights", icon: Lightbulb },
-    {
-      label: "Recommendations",
-      href: "/dashboard/recommendations",
-      icon: Sparkles,
-    },
+    { label: "Opportunities", href: "/dashboard/opportunities", icon: Sparkles },
+    { label: "Calendar", href: "/dashboard/calendar", icon: Calendar },
     { label: "Settings", href: "/dashboard/settings", icon: Settings },
   ];
 
   const searchPlaceholder = pathname.endsWith("/videos")
     ? "Search your video library..."
-    : "Search analytics, insights or videos...";
+    : "Search videos or opportunities...";
 
   if (loading) {
     return (

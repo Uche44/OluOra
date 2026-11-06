@@ -1,5 +1,7 @@
 import httpx
 import logging
+import html
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -152,4 +154,98 @@ async def fetch_comment_threads(
                 raise
             logger.error(f"Error fetching YouTube comment threads: {e}")
             raise
+
+
+CAPTIONS_LIST_URL = "https://www.googleapis.com/youtube/v3/captions"
+CAPTIONS_DOWNLOAD_URL = "https://www.googleapis.com/youtube/v3/captions/{caption_id}"
+
+
+def _vtt_to_text(vtt: str) -> str:
+    """Flatten a WebVTT caption track into a clean paragraph."""
+    lines: list[str] = []
+    for raw in vtt.splitlines():
+        line = raw.strip()
+        if not line or line == "WEBVTT":
+            continue
+        if "-->" in line:
+            continue
+        if line.startswith(("NOTE", "STYLE", "REGION", "Kind:", "Language:")):
+            continue
+        if line.isdigit():
+            continue
+        line = re.sub(r"<[^>]+>", "", line)
+        line = html.unescape(line).strip()
+        if line and (not lines or lines[-1] != line):
+            lines.append(line)
+    return " ".join(lines)
+
+
+async def fetch_video_transcript(
+    access_token: str, video_id: str
+) -> tuple[str | None, int]:
+    """Fetch the creator-owned video's caption track as plain text.
+
+    Returns ``(text, quota_units)``. A missing caption track, a non-owned video,
+    or a permission failure returns ``(None, units)`` rather than raising, so
+    script generation can fall back to the video description.
+    """
+    headers = {"Authorization": f"Bearer {access_token}"}
+    units = 50  # captions.list
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        try:
+            response = await client.get(
+                CAPTIONS_LIST_URL,
+                params={"part": "snippet", "videoId": video_id},
+                headers=headers,
+            )
+        except Exception as exc:
+            logger.warning("YouTube captions.list request failed: %s", exc)
+            return None, units
+
+        if response.status_code != 200:
+            logger.warning(
+                "YouTube captions.list failed: %s - %s",
+                response.status_code,
+                response.text[:200],
+            )
+            return None, units
+
+        items = response.json().get("items", [])
+        if not items:
+            logger.info("No caption tracks found for video %s", video_id)
+            return None, units
+
+        def _score(item: dict) -> tuple[bool, bool]:
+            snippet = item.get("snippet", {})
+            manual = snippet.get("trackKind") != "ASR"
+            english = (snippet.get("language") or "").lower().startswith("en")
+            return manual, english
+
+        caption = max(items, key=_score)
+        caption_id = caption.get("id")
+        if not caption_id:
+            return None, units
+
+        units += 200  # captions.download
+        try:
+            download = await client.get(
+                CAPTIONS_DOWNLOAD_URL.format(caption_id=caption_id),
+                params={"tfmt": "vtt"},
+                headers=headers,
+            )
+        except Exception as exc:
+            logger.warning("YouTube captions.download request failed: %s", exc)
+            return None, units
+
+        if download.status_code != 200:
+            logger.warning(
+                "YouTube captions.download failed: %s - %s",
+                download.status_code,
+                download.text[:200],
+            )
+            return None, units
+
+        text = _vtt_to_text(download.text)
+        return (text or None), units
 

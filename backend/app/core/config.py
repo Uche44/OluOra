@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     # Callback for the isolated admin app's Google sign-in (register it as an
     # additional authorized redirect URI in Google Cloud Console).
     GOOGLE_ADMIN_REDIRECT_URI: str = "http://localhost:3001/auth/callback"
+    # Fetch the creator's video captions on demand when generating a script.
+    # Captions are cached on the video row; downloading them costs YouTube quota.
+    YOUTUBE_TRANSCRIPT_ENABLED: bool = True
 
     # TikTok OAuth (Login Kit)
     TIKTOK_CLIENT_KEY: str = ""
@@ -116,6 +119,9 @@ class Settings(BaseSettings):
     # Large clusters are split into this many sub-groups before sampling so
     # internal sub-themes are represented, not just the cluster centroid.
     ANALYSIS_SUBCLUSTERS: int = 6
+    # Minimum cosine similarity between an opportunity and a cited comment.
+    # Comments below this are dropped as inaccurate supporting evidence.
+    OPPORTUNITY_EVIDENCE_MIN_SIMILARITY: float = 0.4
 
     # CORS Origins (comma-separated string in env)
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"

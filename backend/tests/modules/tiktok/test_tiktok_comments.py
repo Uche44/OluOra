@@ -142,7 +142,7 @@ async def test_sync_tiktok_comments_stores_and_dedupes(
     assert stored[0].author_name == "Alice"
 
     await db.refresh(video)
-    assert video.sync_status == "completed"
+    assert video.sync_status == "synced"
     assert video.last_synced_at is not None
 
 

@@ -10,6 +10,7 @@ interface VideoDetails {
   like_count: number;
   comment_count: number;
   sync_status: string;
+  analysis_status: string | null;
 }
 
 interface AnalysisRun {

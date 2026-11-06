@@ -7,6 +7,11 @@ from app.core.db import Base
 
 class Analysis(Base):
     __tablename__ = "analyses"
+    __table_args__ = (
+        # Backs "does this video have a completed analysis?" (list filter and
+        # dashboard count) and the per-video latest-analysis lookup.
+        Index("ix_analyses_video_id_status", "video_id", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     video_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False)

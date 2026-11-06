@@ -66,7 +66,7 @@ async def test_full_database_relationships_and_cascades(db: AsyncSession):
         view_count=500,
         like_count=45,
         comment_count=2,
-        sync_status="completed"
+        sync_status="synced"
     )
     db.add(video)
     await db.commit()

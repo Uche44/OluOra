@@ -334,7 +334,7 @@ export default function DashboardPage() {
             Recommended Actions
           </h3>
           <Link
-            href="/dashboard/recommendations"
+            href="/dashboard/opportunities"
             className="text-xs font-semibold font-literata text-[#735c00] hover:underline"
           >
             View All Opportunities

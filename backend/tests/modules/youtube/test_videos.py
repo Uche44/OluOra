@@ -1,9 +1,11 @@
 import pytest
 import uuid
 from datetime import datetime, timezone
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import AsyncClient
 from app.modules.users.models import User
+from app.modules.analysis.models import Analysis
 from app.modules.youtube.models import Channel, Video
 from app.core.security import create_access_token
 
@@ -106,18 +108,26 @@ async def test_get_videos_status_filter(client: AsyncClient, db: AsyncSession):
     user = await create_mock_user(db, "status@gmail.com", "Status User")
     channel = await create_mock_channel(db, user.id, "UC_status", "Status Channel")
 
-    await create_mock_video(db, channel.id, "v1", "Video One", "Desc 1", 10, 0, "completed")
+    await create_mock_video(db, channel.id, "v1", "Video One", "Desc 1", 10, 0, "synced")
     await create_mock_video(db, channel.id, "v2", "Video Two", "Desc 2", 20, 0, "pending")
+
+    # "Analyzed" is driven by a completed Analysis run, not by sync_status.
+    analyzed_video = (
+        await db.execute(select(Video).where(Video.external_id == "v1"))
+    ).scalar_one()
+    db.add(Analysis(video_id=analyzed_video.id, status="completed", comments_analyzed=5))
+    await db.commit()
 
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Filter for analyzed (completed)
+    # Filter for analyzed (completed analysis run)
     response = await client.get("/api/v1/videos?status=analyzed", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data["data"]) == 1
     assert data["data"][0]["external_id"] == "v1"
+    assert data["data"][0]["analysis_status"] == "completed"
 
     # Filter for pending
     response = await client.get("/api/v1/videos?status=pending", headers=headers)
@@ -162,7 +172,9 @@ async def test_get_videos_sorting_and_pagination(client: AsyncClient, db: AsyncS
 async def test_get_video_details_success(client: AsyncClient, db: AsyncSession):
     user = await create_mock_user(db, "details_creator@gmail.com", "Details Creator")
     channel = await create_mock_channel(db, user.id, "UC_details", "Details Channel")
-    video = await create_mock_video(db, channel.id, "v_details", "Video Details Title", "Awesome description", 1500, 15, "completed")
+    video = await create_mock_video(db, channel.id, "v_details", "Video Details Title", "Awesome description", 1500, 15, "synced")
+    db.add(Analysis(video_id=video.id, status="completed", comments_analyzed=10))
+    await db.commit()
 
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
@@ -175,7 +187,8 @@ async def test_get_video_details_success(client: AsyncClient, db: AsyncSession):
     assert data["description"] == "Awesome description"
     assert data["view_count"] == 1500
     assert data["comment_count"] == 15
-    assert data["sync_status"] == "completed"
+    assert data["sync_status"] == "synced"
+    assert data["analysis_status"] == "completed"
 
 
 async def test_get_video_details_unauthorized(client: AsyncClient, db: AsyncSession):

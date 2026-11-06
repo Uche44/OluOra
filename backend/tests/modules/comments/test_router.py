@@ -34,7 +34,7 @@ async def test_get_comments_list_success(client: AsyncClient, db: AsyncSession):
         external_id="video-router",
         title="Testing Router Comments",
         published_at=datetime.now(timezone.utc),
-        sync_status="completed"
+        sync_status="synced"
     )
     db.add(video)
     await db.commit()
@@ -138,7 +138,7 @@ async def test_sync_comments_endpoint_success(mock_sync, mock_refresh, client: A
     
     # Update video sync_status inside mock to match successful behavior
     async def mock_sync_side_effect(db_session, video_obj, token):
-        video_obj.sync_status = "completed"
+        video_obj.sync_status = "synced"
         return 8
     mock_sync.side_effect = mock_sync_side_effect
 
@@ -152,7 +152,7 @@ async def test_sync_comments_endpoint_success(mock_sync, mock_refresh, client: A
     data = response.json()
     assert data["success"] is True
     assert data["data"]["synced_count"] == 8
-    assert data["data"]["sync_status"] == "completed"
+    assert data["data"]["sync_status"] == "synced"
 
 
 async def test_sync_comments_endpoint_no_connected_account(client: AsyncClient, db: AsyncSession):

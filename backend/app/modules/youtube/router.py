@@ -1,10 +1,11 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, exists
 from app.core.db import get_db
 from app.dependencies.auth import get_current_user
 from app.modules.users.models import User
+from app.modules.analysis.models import Analysis
 from app.modules.youtube.models import Channel, Video
 from app.modules.youtube.services import sync_youtube_data
 
@@ -77,12 +78,18 @@ async def get_videos_list(
                 )
             )
 
-        # Apply analysis status filter
+        # "Analyzed" is derived from the latest Analysis run, not from comment
+        # sync state. A video with comments synced but no completed analysis is
+        # still pending from the creator's point of view.
+        analyzed_exists = exists().where(
+            Analysis.video_id == Video.id,
+            Analysis.status == "completed",
+        )
         if status_filter:
             if status_filter == "analyzed":
-                base_query = base_query.where(Video.sync_status == "completed")
+                base_query = base_query.where(analyzed_exists)
             elif status_filter == "pending":
-                base_query = base_query.where(Video.sync_status == "pending")
+                base_query = base_query.where(~analyzed_exists)
 
         # Get total count matching query criteria
         count_query = select(func.count()).select_from(base_query.subquery())
@@ -108,6 +115,18 @@ async def get_videos_list(
         result = await db.execute(base_query)
         videos = result.scalars().all()
 
+        # Latest analysis run per video, newest first so the first row wins.
+        latest_analysis: dict[uuid.UUID, str] = {}
+        video_ids = [v.id for v in videos]
+        if video_ids:
+            analysis_rows = await db.execute(
+                select(Analysis.video_id, Analysis.status)
+                .where(Analysis.video_id.in_(video_ids))
+                .order_by(Analysis.created_at.desc())
+            )
+            for video_id, analysis_status in analysis_rows:
+                latest_analysis.setdefault(video_id, analysis_status)
+
         # Serialize results to match JSON contract response layout
         video_list = []
         for v in videos:
@@ -123,6 +142,7 @@ async def get_videos_list(
                 "like_count": v.like_count,
                 "comment_count": v.comment_count,
                 "sync_status": v.sync_status,
+                "analysis_status": latest_analysis.get(v.id),
                 "last_synced_at": v.last_synced_at.isoformat() if v.last_synced_at else None
             })
 
@@ -166,6 +186,16 @@ async def get_video_details(
                 "message": "The requested video does not exist or you do not have permission to view it."
             }
         )
+
+    latest_analysis_status = (
+        await db.execute(
+            select(Analysis.status)
+            .where(Analysis.video_id == video.id)
+            .order_by(Analysis.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
     return {
         "id": str(video.id),
         "platform": video.platform,
@@ -178,6 +208,7 @@ async def get_video_details(
         "like_count": video.like_count,
         "comment_count": video.comment_count,
         "sync_status": video.sync_status,
+        "analysis_status": latest_analysis_status,
         "last_synced_at": video.last_synced_at.isoformat() if video.last_synced_at else None
     }
 

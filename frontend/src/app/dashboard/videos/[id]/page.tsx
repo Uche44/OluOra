@@ -22,8 +22,6 @@ import {
   Heart,
   Search,
   X,
-  Check,
-  Rocket,
 } from "lucide-react";
 
 export default function VideoInsightsPage({
@@ -54,60 +52,6 @@ export default function VideoInsightsPage({
   type InsightTab = "questions" | "pain_points" | "positive_themes";
   const [activeTab, setActiveTab] = useState<InsightTab>("questions");
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Content Recommendations (Section 3) state
-  type RecStatus = "none" | "planned" | "in_progress" | "dismissed";
-  type RecMeta = {
-    status: RecStatus;
-    title: string;
-    content: string;
-    videoId: string;
-    videoTitle: string;
-  };
-  const LS_KEY = "olundi_recs";
-  const [recStatuses, setRecStatuses] = useState<Record<string, RecMeta>>({});
-  type RecFilterTab = "all" | "active" | "planned" | "dismissed";
-  const [recFilter, setRecFilter] = useState<RecFilterTab>("all");
-
-  // Load statuses from localStorage whenever recommendations change
-  const loadRecStatuses = (
-    recs: InsightItem[],
-    videoData: VideoDetails | null,
-  ) => {
-    try {
-      const stored: Record<string, RecMeta> = JSON.parse(
-        localStorage.getItem(LS_KEY) || "{}",
-      );
-      // Seed any newly seen recommendations that aren't in localStorage yet
-      recs.forEach((rec) => {
-        if (!stored[rec.id]) {
-          stored[rec.id] = {
-            status: "none",
-            title: rec.title,
-            content: rec.content,
-            videoId: videoData?.id ?? "",
-            videoTitle: videoData?.title ?? "Unknown Video",
-          };
-        }
-      });
-      localStorage.setItem(LS_KEY, JSON.stringify(stored));
-      setRecStatuses(stored);
-    } catch {
-      // localStorage not available (SSR safety)
-    }
-  };
-
-  const setRecStatus = (recId: string, status: RecStatus) => {
-    setRecStatuses((prev) => {
-      const updated = { ...prev, [recId]: { ...prev[recId], status } };
-      try {
-        localStorage.setItem(LS_KEY, JSON.stringify(updated));
-      } catch {
-        /* noop */
-      }
-      return updated;
-    });
-  };
 
   // Fetch functions
   const loadData = useCallback(
@@ -171,7 +115,6 @@ export default function VideoInsightsPage({
           if (recsRes.ok) {
             const recsData: InsightItem[] = await recsRes.json();
             setRecommendations(recsData);
-            loadRecStatuses(recsData, videoData);
           }
         }
       } catch (err: any) {
@@ -1031,7 +974,6 @@ export default function VideoInsightsPage({
 
       {/* Section 3: Content Recommendations */}
       <div className="bg-white border border-outline-variant/10 rounded-3xl p-8 shadow-sm flex flex-col gap-6">
-        {/* Header + filter */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex flex-col">
             <h2 className="font-playfair text-xl font-bold text-primary">
@@ -1041,191 +983,41 @@ export default function VideoInsightsPage({
               AI-suggested ideas derived from subscriber conversations.
             </p>
           </div>
-
-          {/* Filter pills */}
-          {recommendations.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {(
-                ["all", "active", "planned", "dismissed"] as RecFilterTab[]
-              ).map((f) => {
-                const counts: Record<RecFilterTab, number> = {
-                  all: recommendations.length,
-                  active: recommendations.filter(
-                    (r) => (recStatuses[r.id]?.status ?? "none") === "none",
-                  ).length,
-                  planned: recommendations.filter((r) =>
-                    ["planned", "in_progress"].includes(
-                      recStatuses[r.id]?.status ?? "",
-                    ),
-                  ).length,
-                  dismissed: recommendations.filter(
-                    (r) =>
-                      (recStatuses[r.id]?.status ?? "none") === "dismissed",
-                  ).length,
-                };
-                const labels: Record<RecFilterTab, string> = {
-                  all: "All",
-                  active: "Unreviewed",
-                  planned: "Planned",
-                  dismissed: "Dismissed",
-                };
-                return (
-                  <button
-                    key={f}
-                    onClick={() => setRecFilter(f)}
-                    className={`px-3 py-1.5 rounded-full text-[11px] font-semibold font-literata border transition cursor-pointer ${
-                      recFilter === f
-                        ? "bg-primary text-on-primary border-primary"
-                        : "bg-transparent border-outline-variant/20 text-on-surface-variant hover:bg-surface-container"
-                    }`}
-                  >
-                    {labels[f]}
-                    {counts[f] > 0 && (
-                      <span className="ml-1 opacity-70">({counts[f]})</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <Link
+            href="/dashboard/opportunities"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary hover:bg-primary-container text-on-primary text-xs font-semibold font-literata transition shadow-sm"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Review in Opportunities</span>
+          </Link>
         </div>
 
-        {/* Cards */}
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5 border-t border-outline-variant/20 pt-6">
           {recommendations.length > 0 ? (
-            (() => {
-              const filtered = recommendations.filter((rec) => {
-                const status = recStatuses[rec.id]?.status ?? "none";
-                if (recFilter === "active") return status === "none";
-                if (recFilter === "planned")
-                  return status === "planned" || status === "in_progress";
-                if (recFilter === "dismissed") return status === "dismissed";
-                return true;
-              });
-
-              if (filtered.length === 0) {
-                return (
-                  <div className="col-span-3 text-center py-10 font-literata text-xs text-on-surface-variant/60 italic">
-                    No recommendations match this filter.
-                  </div>
-                );
-              }
-
-              return filtered.map((rec) => {
-                const status = recStatuses[rec.id]?.status ?? "none";
-                const isDismissed = status === "dismissed";
-
-                const statusConfig: Record<
-                  string,
-                  { label: string; color: string }
-                > = {
-                  none: { label: "", color: "" },
-                  planned: {
-                    label: "Planned",
-                    color: "bg-amber-100 text-amber-800 border-amber-200",
-                  },
-                  in_progress: {
-                    label: "In Progress",
-                    color: "bg-sky-100 text-sky-800 border-sky-200",
-                  },
-                  dismissed: {
-                    label: "Dismissed",
-                    color: "bg-neutral-100 text-neutral-500 border-neutral-200",
-                  },
-                };
-
-                return (
-                  <div
-                    key={rec.id}
-                    className={`relative bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-5 shadow-sm flex flex-col justify-between transition ${
-                      isDismissed ? "opacity-40" : "hover:shadow"
-                    }`}
-                  >
-                    {/* Status chip */}
-                    {status !== "none" && (
-                      <span
-                        className={`absolute top-3 right-3 text-[9px] font-bold tracking-wider px-2 py-0.5 rounded-full border ${statusConfig[status].color}`}
-                      >
-                        {statusConfig[status].label}
-                      </span>
-                    )}
-
-                    <div className="flex flex-col gap-3">
-                      <h4
-                        className={`font-playfair text-base font-bold mt-1 pr-16 ${isDismissed ? "line-through text-on-surface-variant" : "text-primary"}`}
-                      >
-                        {rec.title}
-                      </h4>
-                      <p className="text-xs text-on-surface-variant font-literata leading-relaxed">
-                        {rec.content}
-                      </p>
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-2 mt-5 pt-4 border-t border-outline-variant/10">
-                      {isDismissed ? (
-                        <button
-                          onClick={() => setRecStatus(rec.id, "none")}
-                          className="text-xs font-semibold font-literata text-primary hover:underline cursor-pointer"
-                        >
-                          Restore
-                        </button>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() =>
-                              setRecStatus(
-                                rec.id,
-                                status === "planned" ? "none" : "planned",
-                              )
-                            }
-                            title="Mark as Planned"
-                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold font-literata border transition cursor-pointer ${
-                              status === "planned"
-                                ? "bg-amber-100 text-amber-800 border-amber-300"
-                                : "bg-surface-container text-on-surface-variant border-outline-variant/20 hover:bg-amber-50 hover:text-amber-800"
-                            }`}
-                          >
-                            <Check className="w-3 h-3" /> Planned
-                          </button>
-                          <button
-                            onClick={() =>
-                              setRecStatus(
-                                rec.id,
-                                status === "in_progress"
-                                  ? "none"
-                                  : "in_progress",
-                              )
-                            }
-                            title="Mark as In Progress"
-                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold font-literata border transition cursor-pointer ${
-                              status === "in_progress"
-                                ? "bg-sky-100 text-sky-800 border-sky-300"
-                                : "bg-surface-container text-on-surface-variant border-outline-variant/20 hover:bg-sky-50 hover:text-sky-800"
-                            }`}
-                          >
-                            <Rocket className="w-3 h-3" /> In Progress
-                          </button>
-                          <button
-                            onClick={() => setRecStatus(rec.id, "dismissed")}
-                            title="Dismiss"
-                            className="ml-auto p-1.5 rounded-full text-on-surface-variant/40 hover:text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              });
-            })()
+            recommendations.map((rec) => (
+              <div
+                key={rec.id}
+                className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-5 shadow-sm flex flex-col gap-3"
+              >
+                <h4 className="font-playfair text-base font-bold text-primary">
+                  {rec.title}
+                </h4>
+                <p className="text-xs text-on-surface-variant font-literata leading-relaxed">
+                  {rec.content}
+                </p>
+              </div>
+            ))
           ) : (
             <div className="col-span-3 text-center py-10 font-literata text-xs text-on-surface-variant/60 italic">
               No recommendations available for this run.
             </div>
           )}
         </div>
+
+        <p className="text-[10px] text-on-surface-variant/60 font-literata">
+          Save, dismiss, and turn these ideas into persisted content
+          opportunities from the Content Opportunities page.
+        </p>
       </div>
     </motion.div>
   );

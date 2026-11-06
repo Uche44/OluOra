@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Video,
   Music2,
+  Palette,
 } from "lucide-react";
 
 interface ConnectedChannel {
@@ -63,6 +64,54 @@ const PROVIDERS: {
   },
 ];
 
+interface StyleProfile {
+  tone: string;
+  language: string;
+  audience_description: string;
+  technical_depth: string;
+  preferred_structures: string[];
+  avoid: string[];
+  posting_cadence: number;
+  preferred_formats: string[];
+  preferred_platforms: string[];
+  reference_notes: string;
+  updated_at: string | null;
+}
+
+const DEFAULT_STYLE: StyleProfile = {
+  tone: "",
+  language: "",
+  audience_description: "",
+  technical_depth: "intermediate",
+  preferred_structures: [],
+  avoid: [],
+  posting_cadence: 3,
+  preferred_formats: [],
+  preferred_platforms: ["youtube"],
+  reference_notes: "",
+  updated_at: null,
+};
+
+const TECHNICAL_DEPTHS = [
+  { value: "beginner", label: "Beginner" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "advanced", label: "Advanced" },
+];
+
+const STYLE_STRUCTURES = [
+  { value: "hook_first", label: "Hook first" },
+  { value: "story", label: "Story" },
+  { value: "tutorial", label: "Tutorial" },
+  { value: "listicle", label: "Listicle" },
+  { value: "case_study", label: "Case study" },
+  { value: "problem_solution", label: "Problem → solution" },
+  { value: "comparison", label: "Comparison" },
+];
+
+const STYLE_FORMATS = ["tutorial", "explainer", "comparison", "faq", "demo", "opinion"];
+const STYLE_PLATFORMS = [{ value: "youtube", label: "YouTube" }];
+
+
 export default function SettingsPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +128,30 @@ export default function SettingsPage() {
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Creator style state
+  const [styleForm, setStyleForm] = useState<StyleProfile>(DEFAULT_STYLE);
+  const [avoidText, setAvoidText] = useState("");
+  const [savingStyle, setSavingStyle] = useState(false);
+  const [styleSaved, setStyleSaved] = useState(false);
+  const [styleError, setStyleError] = useState<string | null>(null);
+
+  const fetchStyle = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await authedFetch(`${apiUrl}/api/v1/content/style`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.detail?.message || "Failed to load style preferences.");
+      }
+      setStyleForm({ ...DEFAULT_STYLE, ...data });
+      setAvoidText((data.avoid || []).join("\n"));
+    } catch (err) {
+      setStyleError(
+        err instanceof Error ? err.message : "Failed to load style preferences.",
+      );
+    }
+  };
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -100,6 +173,7 @@ export default function SettingsPage() {
     }
   };
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     // Surface a message left by the OAuth connect callback.
     const pending = sessionStorage.getItem("connect_flash");
@@ -109,7 +183,9 @@ export default function SettingsPage() {
       setTimeout(() => setFlash(null), 5000);
     }
     fetchProfile();
+    fetchStyle();
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,6 +259,80 @@ export default function SettingsPage() {
     }
   };
 
+  const updateStyle = (field: keyof StyleProfile, value: string | number) => {
+    setStyleForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const toggleStyleList = (
+    field: "preferred_structures" | "preferred_formats" | "preferred_platforms",
+    value: string,
+  ) => {
+    setStyleForm((current) => {
+      const values = current[field];
+      return {
+        ...current,
+        [field]: values.includes(value)
+          ? values.filter((item) => item !== value)
+          : [...values, value],
+      };
+    });
+  };
+
+  const handleStyleSave = async (
+    event?: React.FormEvent | React.MouseEvent,
+  ) => {
+    event?.preventDefault();
+    setSavingStyle(true);
+    setStyleError(null);
+    setStyleSaved(false);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const payload = {
+        tone: styleForm.tone,
+        language: styleForm.language,
+        audience_description: styleForm.audience_description,
+        technical_depth: styleForm.technical_depth,
+        preferred_structures: styleForm.preferred_structures,
+        avoid: avoidText
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        posting_cadence: styleForm.posting_cadence,
+        preferred_formats: styleForm.preferred_formats,
+        preferred_platforms: styleForm.preferred_platforms,
+        reference_notes: styleForm.reference_notes,
+      };
+      const res = await authedFetch(`${apiUrl}/api/v1/content/style`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = data?.detail;
+        const detailMessage = Array.isArray(detail)
+          ? detail
+              .map((item: { msg?: string }) => item?.msg)
+              .filter(Boolean)
+              .join(", ")
+          : typeof detail === "string"
+            ? detail
+            : detail?.message;
+        throw new Error(detailMessage || "Failed to save style preferences.");
+      }
+      setStyleForm({ ...DEFAULT_STYLE, ...data });
+      setAvoidText((data.avoid || []).join("\n"));
+      setStyleSaved(true);
+      setTimeout(() => setStyleSaved(false), 3000);
+    } catch (err) {
+      setStyleError(
+        err instanceof Error ? err.message : "Failed to save style preferences.",
+      );
+    } finally {
+      setSavingStyle(false);
+    }
+  };
+
   const formatNumber = (num: number) => {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
     if (num >= 1000) return (num / 1000).toFixed(1) + "K";
@@ -225,7 +375,7 @@ export default function SettingsPage() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="flex flex-col gap-8 text-on-surface"
+      className="flex flex-col gap-8 text-on-surface pb-28"
     >
       {/* Header */}
       <div className="flex flex-col gap-1">
@@ -470,6 +620,286 @@ export default function SettingsPage() {
             })}
           </div>
         </div>
+      </div>
+
+      {/* Creator Style */}
+      <div className="bg-white/70 backdrop-blur-md border border-outline-variant/10 rounded-3xl p-8 shadow-sm flex flex-col gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline-variant/10 pb-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#0b3d2e]/10 flex items-center justify-center flex-shrink-0">
+              <Palette className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex flex-col">
+              <h2 className="font-playfair text-lg font-bold text-primary">
+                Creator Style
+              </h2>
+              <p className="text-xs font-literata text-on-surface-variant mt-0.5">
+                Manual preferences used when generating scripts and briefs.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <AnimatePresence>
+              {styleSaved && (
+                <motion.span
+                  initial={{ opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold font-literata"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Style saved
+                </motion.span>
+              )}
+            </AnimatePresence>
+            <button
+              type="button"
+              onClick={handleStyleSave}
+              disabled={savingStyle}
+              className="px-5 py-2 rounded-full bg-primary hover:bg-primary-container text-on-primary text-xs font-semibold font-literata transition shadow-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
+            >
+              {savingStyle ? "Saving..." : "Save style preferences"}
+            </button>
+          </div>
+        </div>
+
+        {styleError && (
+          <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl flex items-center justify-between font-literata text-xs">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              <span>{styleError}</span>
+            </div>
+            <button
+              onClick={() => setStyleError(null)}
+              className="font-bold p-1 cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        <form onSubmit={handleStyleSave} className="grid md:grid-cols-2 gap-5">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+              Tone
+            </span>
+            <input
+              value={styleForm.tone}
+              onChange={(event) => updateStyle("tone", event.target.value)}
+              placeholder="e.g. warm, direct, practical"
+              className="px-3 py-2.5 rounded-xl border border-outline-variant/30 text-sm font-literata bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+              Language
+            </span>
+            <input
+              value={styleForm.language}
+              onChange={(event) => updateStyle("language", event.target.value)}
+              placeholder="e.g. English"
+              className="px-3 py-2.5 rounded-xl border border-outline-variant/30 text-sm font-literata bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </label>
+
+          <label className="md:col-span-2 flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+              Audience description
+            </span>
+            <textarea
+              value={styleForm.audience_description}
+              onChange={(event) =>
+                updateStyle("audience_description", event.target.value)
+              }
+              rows={2}
+              placeholder="Who the content is for, and what they already know"
+              className="px-3 py-2.5 rounded-xl border border-outline-variant/30 text-sm font-literata bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+              Technical depth
+            </span>
+            <select
+              value={styleForm.technical_depth}
+              onChange={(event) =>
+                updateStyle("technical_depth", event.target.value)
+              }
+              className="px-3 py-2.5 rounded-xl border border-outline-variant/30 text-sm font-literata bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {TECHNICAL_DEPTHS.map((depth) => (
+                <option key={depth.value} value={depth.value}>
+                  {depth.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+              Posting cadence (per week)
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={14}
+              value={styleForm.posting_cadence}
+              onChange={(event) =>
+                updateStyle(
+                  "posting_cadence",
+                  Math.max(1, Number(event.target.value) || 1),
+                )
+              }
+              className="px-3 py-2.5 rounded-xl border border-outline-variant/30 text-sm font-literata bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </label>
+
+          <div className="md:col-span-2 flex flex-col gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+              Preferred structures
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {STYLE_STRUCTURES.map((structure) => {
+                const active = styleForm.preferred_structures.includes(
+                  structure.value,
+                );
+                return (
+                  <button
+                    key={structure.value}
+                    type="button"
+                    onClick={() =>
+                      toggleStyleList("preferred_structures", structure.value)
+                    }
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold font-literata border transition cursor-pointer ${
+                      active
+                        ? "bg-primary text-on-primary border-primary"
+                        : "border-outline-variant/20 text-on-surface-variant hover:bg-surface-container"
+                    }`}
+                  >
+                    {structure.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="md:col-span-2 flex flex-col gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+              Preferred formats
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {STYLE_FORMATS.map((format) => {
+                const active = styleForm.preferred_formats.includes(format);
+                return (
+                  <button
+                    key={format}
+                    type="button"
+                    onClick={() => toggleStyleList("preferred_formats", format)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold font-literata border transition capitalize cursor-pointer ${
+                      active
+                        ? "bg-primary text-on-primary border-primary"
+                        : "border-outline-variant/20 text-on-surface-variant hover:bg-surface-container"
+                    }`}
+                  >
+                    {format}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="md:col-span-2 flex flex-col gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+              Preferred platforms
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {STYLE_PLATFORMS.map((platform) => {
+                const active = styleForm.preferred_platforms.includes(
+                  platform.value,
+                );
+                return (
+                  <button
+                    key={platform.value}
+                    type="button"
+                    onClick={() =>
+                      toggleStyleList("preferred_platforms", platform.value)
+                    }
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold font-literata border transition cursor-pointer ${
+                      active
+                        ? "bg-primary text-on-primary border-primary"
+                        : "border-outline-variant/20 text-on-surface-variant hover:bg-surface-container"
+                    }`}
+                  >
+                    {platform.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <label className="md:col-span-2 flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+              Things to avoid
+            </span>
+            <textarea
+              value={avoidText}
+              onChange={(event) => setAvoidText(event.target.value)}
+              rows={2}
+              placeholder={"One per line, e.g. jargon\nlong intros"}
+              className="px-3 py-2.5 rounded-xl border border-outline-variant/30 text-sm font-literata bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+            />
+          </label>
+
+          <label className="md:col-span-2 flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+              Additional style notes
+            </span>
+            <textarea
+              value={styleForm.reference_notes}
+              onChange={(event) =>
+                updateStyle("reference_notes", event.target.value)
+              }
+              rows={2}
+              placeholder="Anything else the scriptwriter should know"
+              className="px-3 py-2.5 rounded-xl border border-outline-variant/30 text-sm font-literata bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+            />
+          </label>
+
+          <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-outline-variant/10 pt-4">
+            <p className="text-[10px] font-literata text-on-surface-variant/70 max-w-lg">
+              These are explicit preferences. Style learning from transcripts or
+              reference content is not enabled yet. Changes apply the next time
+              you generate a script; existing versions are kept.
+            </p>
+            <div className="flex items-center gap-3 self-end sm:self-auto">
+              {styleSaved && (
+                <span className="flex items-center gap-1 text-xs font-semibold font-literata text-emerald-700">
+                  <CheckCircle className="w-4 h-4" />
+                  Saved
+                </span>
+              )}
+              {styleError && (
+                <span className="max-w-[220px] text-[10px] font-literata text-amber-700">
+                  {styleError}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleStyleSave}
+                disabled={savingStyle}
+                className="px-6 py-2.5 rounded-full bg-primary hover:bg-primary-container text-on-primary text-xs font-semibold font-literata transition shadow-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
+              >
+                {savingStyle
+                  ? "Saving..."
+                  : styleSaved
+                    ? "Saved"
+                    : "Save style preferences"}
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     </motion.div>
   );

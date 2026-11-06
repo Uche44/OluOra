@@ -20,6 +20,13 @@ from app.modules.analysis.models import (
 )
 from app.modules.feedback.models import Feedback
 from app.modules.email.models import EmailBatch, EmailMessage
+from app.modules.content.models import (
+    ContentOpportunity,
+    ContentOpportunityEvidence,
+    ContentCalendarItem,
+    ContentScript,
+    CreatorStyleProfile,
+)
 from app.modules.admin.services import sync_admin_flags
 
 logger = logging.getLogger(__name__)

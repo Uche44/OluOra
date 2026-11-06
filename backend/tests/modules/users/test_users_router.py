@@ -7,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.users.models import User, SocialAccount
-from app.modules.youtube.models import Channel
+from app.modules.analysis.models import Analysis
+from app.modules.youtube.models import Channel, Video
 from app.core.config import settings
 from app.core.security import create_access_token
 
@@ -184,4 +185,51 @@ async def test_get_dashboard_stats(client: AsyncClient, db: AsyncSession):
     assert "questions_discovered" in data
     assert "sentiment_score" in data
     assert "growth_score" in data
+
+
+async def test_dashboard_counts_only_completed_analyses(client: AsyncClient, db: AsyncSession):
+    """videos_analyzed must require a completed Analysis, not just synced comments."""
+    user = User(email="dash_count@gmail.com", full_name="Dash Count", is_active=True)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    channel = Channel(
+        creator_id=user.id,
+        platform="youtube",
+        external_id="UC_dash_count",
+        title="Dash Count Channel",
+    )
+    db.add(channel)
+    await db.flush()
+
+    analyzed = Video(
+        channel_id=channel.id,
+        platform="youtube",
+        external_id="dash_v_analyzed",
+        title="Analyzed Video",
+        published_at=datetime.now(timezone.utc),
+        sync_status="synced",
+    )
+    synced_only = Video(
+        channel_id=channel.id,
+        platform="youtube",
+        external_id="dash_v_synced",
+        title="Synced Only Video",
+        published_at=datetime.now(timezone.utc),
+        sync_status="synced",
+    )
+    db.add_all([analyzed, synced_only])
+    await db.flush()
+
+    db.add(Analysis(video_id=analyzed.id, status="completed", comments_analyzed=10))
+    db.add(Analysis(video_id=synced_only.id, status="failed", comments_analyzed=0))
+    await db.commit()
+
+    token = create_access_token({"sub": str(user.id)})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = await client.get("/api/v1/users/dashboard", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["videos_analyzed"] == 1
 

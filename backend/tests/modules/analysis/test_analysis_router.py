@@ -36,7 +36,7 @@ async def test_get_analysis_insights_success(client: AsyncClient, db: AsyncSessi
         external_id="video-insights-router",
         title="Testing Router Insights",
         published_at=datetime.now(timezone.utc),
-        sync_status="completed"
+        sync_status="synced"
     )
     db.add(video)
     await db.commit()
@@ -133,7 +133,7 @@ async def test_get_analysis_recommendations_success(client: AsyncClient, db: Asy
         external_id="video-recs-router",
         title="Testing Router Recommendations",
         published_at=datetime.now(timezone.utc),
-        sync_status="completed"
+        sync_status="synced"
     )
     db.add(video)
     await db.commit()
@@ -216,7 +216,7 @@ async def test_run_analysis_success(client: AsyncClient, db: AsyncSession):
         external_id="video-run-router",
         title="Testing Router Run",
         published_at=datetime.now(timezone.utc),
-        sync_status="completed"
+        sync_status="synced"
     )
     db.add(video)
     await db.commit()
@@ -262,7 +262,7 @@ async def test_get_analysis_history_success(client: AsyncClient, db: AsyncSessio
         external_id="video-hist-router",
         title="Testing Router History",
         published_at=datetime.now(timezone.utc),
-        sync_status="completed"
+        sync_status="synced"
     )
     db.add(video)
     await db.commit()
@@ -312,7 +312,7 @@ async def test_get_analysis_run_details(client: AsyncClient, db: AsyncSession):
         external_id="video-run-det-router",
         title="Testing Router Run Det",
         published_at=datetime.now(timezone.utc),
-        sync_status="completed"
+        sync_status="synced"
     )
     db.add(video)
     await db.commit()
@@ -358,7 +358,7 @@ async def test_get_latest_analysis_success(client: AsyncClient, db: AsyncSession
         external_id="video-latest-router",
         title="Testing Router Latest",
         published_at=datetime.now(timezone.utc),
-        sync_status="completed"
+        sync_status="synced"
     )
     db.add(video)
     await db.commit()
@@ -411,7 +411,7 @@ async def test_get_analysis_clusters_success(client: AsyncClient, db: AsyncSessi
         external_id="video-clusters-router",
         title="Testing Router Clusters",
         published_at=datetime.now(timezone.utc),
-        sync_status="completed"
+        sync_status="synced"
     )
     db.add(video)
     await db.commit()

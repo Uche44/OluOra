@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import providers
@@ -159,10 +159,16 @@ async def get_dashboard_stats(
     """Aggregates and returns live statistics, summary cards, and recommended actions for the creator dashboard."""
     from datetime import datetime
 
-    # 1. Videos Analyzed: count of videos where sync_status is 'completed'
-    videos_query = select(func.count(Video.id)).join(Channel).where(
-        Channel.creator_id == current_user.id,
-        Video.sync_status == "completed"
+    # 1. Videos Analyzed: distinct videos with at least one completed analysis
+    videos_query = (
+        select(func.count(distinct(Analysis.video_id)))
+        .select_from(Analysis)
+        .join(Video, Video.id == Analysis.video_id)
+        .join(Channel, Channel.id == Video.channel_id)
+        .where(
+            Channel.creator_id == current_user.id,
+            Analysis.status == "completed",
+        )
     )
     videos_result = await db.execute(videos_query)
     videos_analyzed = videos_result.scalar_one()

@@ -29,6 +29,7 @@ interface VideoItem {
   like_count: number;
   comment_count: number;
   sync_status: string;
+  analysis_status: string | null;
   last_synced_at: string | null;
 }
 
@@ -150,7 +151,7 @@ export default function VideosPage() {
       
       if (res.ok && payload.success) {
         const syncedCount = payload.data?.synced_count ?? 0;
-        const newStatus = payload.data?.sync_status ?? "completed";
+        const newStatus = payload.data?.sync_status ?? "synced";
         
         setVideos(prev => 
           prev.map(v => v.id === videoId ? { ...v, sync_status: newStatus, last_synced_at: new Date().toISOString() } : v)
@@ -222,7 +223,7 @@ export default function VideosPage() {
       {/* Search Syncer Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex flex-col">
-          <h1 className="font-playfair text-3xl font-bold text-primary">Video Intelligence</h1>
+          <h1 className="font-playfair text-3xl font-bold text-primary">Your Videos</h1>
           <p className="text-on-surface-variant font-literata text-sm mt-1 max-w-xl leading-relaxed">
             Manage your content library and harness AI-driven audience insights for every upload.
           </p>
@@ -428,7 +429,11 @@ export default function VideosPage() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {videos.map((video) => {
-            const isAnalyzed = video.sync_status === "completed";
+            const isAnalyzed = video.analysis_status === "completed";
+            const analysisInProgress =
+              video.analysis_status === "pending" ||
+              video.analysis_status === "running";
+            const commentsSynced = video.sync_status === "synced";
             const isAnalyzing = analyzingVideoId === video.id;
 
             return (
@@ -469,10 +474,20 @@ export default function VideosPage() {
                         <Sparkles className="w-2.5 h-2.5 text-secondary" />
                         <span>Analyzed</span>
                       </span>
+                    ) : analysisInProgress ? (
+                      <span className="bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-semibold font-literata px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                        <RotateCw className="w-2.5 h-2.5 text-sky-500 animate-spin" />
+                        <span>Analyzing</span>
+                      </span>
                     ) : video.sync_status === "disabled" ? (
                       <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold font-literata px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
                         <AlertTriangle className="w-2.5 h-2.5 text-amber-500" />
                         <span>Disabled</span>
+                      </span>
+                    ) : commentsSynced ? (
+                      <span className="bg-white/95 text-primary border border-outline-variant/30 text-[10px] font-semibold font-literata px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                        <Sparkles className="w-2.5 h-2.5 text-secondary" />
+                        <span>Ready to Analyze</span>
                       </span>
                     ) : (
                       <span className="bg-white/95 text-primary border border-outline-variant/30 text-[10px] font-semibold font-literata px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
@@ -516,6 +531,13 @@ export default function VideosPage() {
                       >
                         View Insights
                       </Link>
+                    ) : analysisInProgress ? (
+                      <Link
+                        href={`/dashboard/videos/${video.id}`}
+                        className="w-full bg-surface-container hover:bg-surface-container-high text-primary font-literata text-xs font-semibold py-2.5 rounded-xl border border-primary/5 transition-colors cursor-pointer text-center block"
+                      >
+                        View Progress
+                      </Link>
                     ) : video.sync_status === "disabled" ? (
                       <button 
                         disabled 
@@ -523,6 +545,14 @@ export default function VideosPage() {
                       >
                         Sync Unavailable
                       </button>
+                    ) : commentsSynced ? (
+                      <Link
+                        href={`/dashboard/videos/${video.id}`}
+                        className="w-full bg-primary hover:bg-primary-container text-on-primary font-literata text-xs font-semibold py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm hover:shadow cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-secondary-container" />
+                        <span>Analyze Comments</span>
+                      </Link>
                     ) : (
                       <button
                         onClick={() => handleAnalyze(video.id)}

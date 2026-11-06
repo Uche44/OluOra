@@ -54,6 +54,10 @@ class Video(Base):
     comment_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     sync_status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False)
     etag: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Cached caption transcript used to ground script generation. Fetched on
+    # demand (YouTube) and kept so repeat generations do not re-download it.
+    transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transcript_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

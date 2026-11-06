@@ -60,7 +60,7 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
             if response_data.get("etag_matched"):
                 logger.info(f"ETag matched for video {video.external_id}. Comments unchanged.")
                 video.last_synced_at = datetime.now(timezone.utc)
-                video.sync_status = "completed"
+                video.sync_status = "synced"
                 db.add(video)
                 await db.commit()
                 return 0
@@ -185,8 +185,8 @@ async def sync_comments_for_video(db: AsyncSession, video: Video, access_token: 
             break
             
     video.last_synced_at = datetime.now(timezone.utc)
-    if video.sync_status != "completed":
-        video.sync_status = "completed"
+    if video.sync_status != "synced":
+        video.sync_status = "synced"
     db.add(video)
     await db.commit()
     
@@ -264,7 +264,7 @@ async def sync_tiktok_comments_for_video(
             break
 
     video.last_synced_at = datetime.now(timezone.utc)
-    video.sync_status = "completed"
+    video.sync_status = "synced"
     db.add(video)
     await db.commit()
 

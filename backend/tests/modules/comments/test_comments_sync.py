@@ -105,7 +105,7 @@ async def test_sync_comments_success(mock_fetch, db: AsyncSession):
 
     # Video status checks
     await db.refresh(video)
-    assert video.sync_status == "completed"
+    assert video.sync_status == "synced"
     assert video.last_synced_at is not None
 
 

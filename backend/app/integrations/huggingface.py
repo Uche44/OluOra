@@ -31,14 +31,19 @@ def get_pseudo_embedding(text: str) -> list[float]:
     return vector
 
 
-async def generate_embeddings(texts: list[str]) -> list[list[float]]:
+async def generate_embeddings(
+    texts: list[str], allow_fallback: bool = True
+) -> list[list[float]]:
     """
     Generates semantic text embeddings using the Hugging Face Inference API.
     Falls back to deterministic local pseudo-embeddings if offline or API is blocked.
+
+    Set ``allow_fallback=False`` when the caller needs real semantic vectors and
+    should skip the operation if the API is unavailable.
     """
     import sys
     if not settings.HF_API_KEY:
-        if "pytest" in sys.modules:
+        if "pytest" in sys.modules or not allow_fallback:
             raise ValueError("HF_API_KEY is not configured in settings.")
         logger.warning("HF_API_KEY is not configured in settings. Using local fallback.")
         return [get_pseudo_embedding(t) for t in texts]
@@ -70,7 +75,7 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]]:
                     response = await client.post(api_url, headers=headers, json=payload)
 
                     if response.status_code != 200:
-                        if "pytest" in sys.modules:
+                        if "pytest" in sys.modules or not allow_fallback:
                             raise Exception(
                                 f"Hugging Face API request failed with status "
                                 f"{response.status_code}: {response.text}"
@@ -92,7 +97,7 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]]:
                     )
 
                 except Exception as batch_err:
-                    if "pytest" in sys.modules:
+                    if "pytest" in sys.modules or not allow_fallback:
                         raise batch_err
                     logger.warning(
                         f"HF batch request failed: {batch_err}. "
@@ -100,7 +105,7 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]]:
                     )
                     all_embeddings.extend([get_pseudo_embedding(t) for t in batch])
     except Exception as client_err:
-        if "pytest" in sys.modules:
+        if "pytest" in sys.modules or not allow_fallback:
             raise client_err
         logger.warning(
             f"Hugging Face Client error: {client_err}. "
