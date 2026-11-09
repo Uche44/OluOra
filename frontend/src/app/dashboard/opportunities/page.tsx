@@ -136,7 +136,13 @@ export default function OpportunitiesPage() {
       }
       const nextSources: AnalysisSource[] = data.data || [];
       setSources(nextSources);
-      setSelectedAnalysisId((current) => current || nextSources[0]?.analysis_id || "");
+      // Sources are one-per-video (latest run). Drop a selection that is no
+      // longer offered, e.g. after a re-analysis replaced the run we held.
+      setSelectedAnalysisId((current) =>
+        nextSources.some((source) => source.analysis_id === current)
+          ? current
+          : nextSources[0]?.analysis_id || "",
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not load analyzed videos.",

@@ -483,6 +483,33 @@ async def test_sources_only_include_completed_analyses(
     assert data[0]["video_title"] == "Camera buying guide"
 
 
+async def test_sources_collapse_reruns_to_latest_completed_analysis(
+    client: AsyncClient, db: AsyncSession
+):
+    seed = await _seed(db, email="sources-rerun@example.com")
+    first_run = seed["analysis"]
+    first_run.created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    second_run = Analysis(
+        video_id=seed["video"].id,
+        status="completed",
+        comments_analyzed=12,
+        created_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+    )
+    db.add(second_run)
+    await db.commit()
+
+    response = await client.get(
+        "/api/v1/content/opportunities/sources",
+        headers=_headers(seed["user"]),
+    )
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert len(data) == 1
+    assert data[0]["analysis_id"] == str(second_run.id)
+    assert data[0]["comments_analyzed"] == 12
+
+
 async def test_list_opportunities_is_creator_scoped(
     client: AsyncClient, db: AsyncSession
 ):

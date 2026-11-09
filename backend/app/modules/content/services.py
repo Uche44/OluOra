@@ -900,13 +900,33 @@ async def update_opportunity_status(
 
 
 async def list_analysis_sources(db: AsyncSession, user: User) -> list[dict]:
+    """List the creator's analyzed videos, one entry per video.
+
+    Each analysis is an immutable run, so re-analyzing a video adds another
+    completed row for the same ``video_id``. The opportunity picker is a video
+    picker, so rank runs per video and keep only the newest completed one.
+    """
+    ranked = (
+        select(
+            Analysis.id.label("analysis_id"),
+            func.row_number()
+            .over(
+                partition_by=Analysis.video_id,
+                order_by=(Analysis.created_at.desc(), Analysis.id.desc()),
+            )
+            .label("run_rank"),
+        )
+        .where(Analysis.status == "completed")
+        .subquery()
+    )
     rows = await db.execute(
         select(Analysis, Video)
+        .join(ranked, ranked.c.analysis_id == Analysis.id)
         .join(Video, Video.id == Analysis.video_id)
         .join(Channel, Channel.id == Video.channel_id)
         .where(
             Channel.creator_id == user.id,
-            Analysis.status == "completed",
+            ranked.c.run_rank == 1,
         )
         .order_by(Analysis.created_at.desc())
     )
