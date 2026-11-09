@@ -76,11 +76,11 @@ export default function HeroSection() {
               className="flex flex-wrap items-center gap-3"
             >
               <Link
-                href="#waitlist"
+                href="/login"
                 id="hero-request-invite"
                 className="inline-flex items-center gap-2 bg-primary text-on-primary font-literata text-sm font-medium px-6 py-3.5 rounded-full hover:bg-primary-container transition-all duration-200 shadow-sm hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-0.5"
               >
-                Join Waitlist
+                Try it now
                 <ArrowRight className="w-4 h-4" />
               </Link>
               {/* <Link

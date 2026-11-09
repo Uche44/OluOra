@@ -19,18 +19,12 @@ import {
 } from "lucide-react";
 import { authedFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import {
+  VideoSourceSelect,
+  type AnalysisSource,
+} from "@/components/dashboard/VideoSourceSelect";
 
 type OpportunityStatus = "new" | "saved" | "dismissed";
-
-interface AnalysisSource {
-  analysis_id: string;
-  video_id: string;
-  video_title: string;
-  thumbnail_url: string | null;
-  platform: string;
-  comments_analyzed: number;
-  created_at: string;
-}
 
 interface Evidence {
   id: string;
@@ -75,14 +69,6 @@ const LENGTH_LABELS: Record<string, string> = {
   long_form: "Long-form",
   short: "Short",
 };
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 function formatScheduledDate(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
@@ -371,18 +357,11 @@ export default function OpportunitiesPage() {
           </div>
         ) : (
           <div className="flex flex-col sm:flex-row gap-3">
-            <select
+            <VideoSourceSelect
+              sources={sources}
               value={selectedAnalysisId}
-              onChange={(event) => setSelectedAnalysisId(event.target.value)}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-outline-variant/30 bg-surface-container-lowest text-sm font-literata text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {sources.map((source) => (
-                <option key={source.analysis_id} value={source.analysis_id}>
-                  {source.video_title} — {source.comments_analyzed} comments —{" "}
-                  {formatDate(source.created_at)}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedAnalysisId}
+            />
             <button
               onClick={() => handleGenerate(false)}
               disabled={generating || !selectedAnalysisId}
