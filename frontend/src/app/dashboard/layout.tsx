@@ -68,7 +68,11 @@ export default function DashboardLayout({
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
     { label: "Videos", href: "/dashboard/videos", icon: Film },
-    { label: "Opportunities", href: "/dashboard/opportunities", icon: Sparkles },
+    {
+      label: "Opportunities",
+      href: "/dashboard/opportunities",
+      icon: Sparkles,
+    },
     { label: "Calendar", href: "/dashboard/calendar", icon: Calendar },
     { label: "Settings", href: "/dashboard/settings", icon: Settings },
   ];
@@ -147,12 +151,12 @@ export default function DashboardLayout({
 
       <div className="flex flex-col gap-4 mt-auto">
         {/* Upgrade Card */}
-        <div className="px-1">
+        {/* <div className="px-1">
           <button className="w-full bg-primary hover:bg-primary-container text-on-primary font-literata text-xs font-semibold py-3 px-4 rounded-xl transition-all duration-150 flex items-center justify-center gap-2 shadow-sm cursor-pointer">
             <Crown className="w-4 h-4 text-secondary-container" />
             <span>Upgrade to Pro</span>
           </button>
-        </div>
+        </div> */}
 
         {/* Bottom utility links */}
         <div className="flex flex-col gap-1 border-t border-outline-variant/20 pt-4">
@@ -183,100 +187,100 @@ export default function DashboardLayout({
   return (
     <FeedbackProvider>
       <div className="min-h-screen flex bg-surface text-on-surface overflow-x-hidden">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:block w-64 border-r border-outline-variant/20 bg-surface-container-lowest flex-shrink-0 h-screen sticky top-0">
-        <SidebarContent />
-      </aside>
+        {/* Desktop Sidebar */}
+        <aside className="hidden md:block w-64 border-r border-outline-variant/20 bg-surface-container-lowest flex-shrink-0 h-screen sticky top-0">
+          <SidebarContent />
+        </aside>
 
-      {/* Main Container */}
-      <div className="flex-1 flex flex-col min-h-screen relative overflow-y-auto">
-        {/* Top Header Bar */}
-        <header className="h-16 border-b border-outline-variant/10 bg-surface/80 backdrop-blur-md sticky top-0 z-40 px-6 flex items-center justify-between">
-          <div className="flex items-center gap-4 flex-1">
-            {/* Mobile menu trigger */}
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="md:hidden p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors"
-              aria-label="Open sidebar"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+        {/* Main Container */}
+        <div className="flex-1 flex flex-col min-h-screen relative overflow-y-auto">
+          {/* Top Header Bar */}
+          <header className="h-16 border-b border-outline-variant/10 bg-surface/80 backdrop-blur-md sticky top-0 z-40 px-6 flex items-center justify-between">
+            <div className="flex items-center gap-4 flex-1">
+              {/* Mobile menu trigger */}
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="md:hidden p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors"
+                aria-label="Open sidebar"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
 
-            {/* Search Input Bar */}
-            <div className="relative max-w-md w-full hidden sm:block">
-              <Search className="w-4 h-4 text-on-surface-variant/60 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder={searchPlaceholder}
-                className="w-full bg-surface-container-low border border-outline-variant/20 rounded-full py-2 pl-10 pr-4 font-literata text-sm focus:outline-none focus:border-primary/40 focus:bg-surface-container-lowest transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              aria-label="Notifications"
-              className="p-2 rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors relative"
-            >
-              <Bell className="w-4.5 h-4.5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary" />
-            </button>
-
-            {/* User Session Profile Picture */}
-            <div className="flex items-center gap-3 border-l border-outline-variant/20 pl-4">
-              <div className="flex flex-col text-right hidden sm:flex">
-                <span className="font-literata text-xs font-semibold text-primary">
-                  {user?.full_name || "Alex Rivera"}
-                </span>
-                <span className="text-[9px] text-on-surface-variant font-medium">
-                  Lead Creator
-                </span>
-              </div>
-              {user?.profile_picture ? (
-                <Image
-                  src={user.profile_picture}
-                  alt="Profile picture"
-                  width={36}
-                  height={36}
-                  className="rounded-full border border-primary/20 object-cover w-9 h-9"
+              {/* Search Input Bar */}
+              <div className="relative max-w-md w-full hidden sm:block">
+                <Search className="w-4 h-4 text-on-surface-variant/60 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder={searchPlaceholder}
+                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-full py-2 pl-10 pr-4 font-literata text-sm focus:outline-none focus:border-primary/40 focus:bg-surface-container-lowest transition-colors"
                 />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center border border-outline-variant/30">
-                  <UserIcon className="w-4 h-4 text-on-surface-variant" />
-                </div>
-              )}
+              </div>
             </div>
-          </div>
-        </header>
 
-        {/* Content Wrapper */}
-        <main className="flex-1 p-6 md:p-8 max-w-[1200px] w-full mx-auto">
-          {children}
-        </main>
-      </div>
+            <div className="flex items-center gap-4">
+              <button
+                aria-label="Notifications"
+                className="p-2 rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors relative"
+              >
+                <Bell className="w-4.5 h-4.5" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary" />
+              </button>
 
-      {/* Mobile Drawer Overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
-          {/* Backdrop click closer */}
-          <div
-            className="fixed inset-0 bg-primary/20 backdrop-blur-sm"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside className="relative w-64 bg-surface-container-lowest h-full shadow-2xl flex flex-col z-50">
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-4 p-2 rounded-lg text-on-surface-variant hover:bg-surface-container"
-              aria-label="Close sidebar"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <SidebarContent />
-          </aside>
+              {/* User Session Profile Picture */}
+              <div className="flex items-center gap-3 border-l border-outline-variant/20 pl-4">
+                <div className="flex flex-col text-right hidden sm:flex">
+                  <span className="font-literata text-xs font-semibold text-primary">
+                    {user?.full_name || "Alex Rivera"}
+                  </span>
+                  <span className="text-[9px] text-on-surface-variant font-medium">
+                    Lead Creator
+                  </span>
+                </div>
+                {user?.profile_picture ? (
+                  <Image
+                    src={user.profile_picture}
+                    alt="Profile picture"
+                    width={36}
+                    height={36}
+                    className="rounded-full border border-primary/20 object-cover w-9 h-9"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center border border-outline-variant/30">
+                    <UserIcon className="w-4 h-4 text-on-surface-variant" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* Content Wrapper */}
+          <main className="flex-1 p-6 md:p-8 max-w-[1200px] w-full mx-auto">
+            {children}
+          </main>
         </div>
-      )}
 
-      <FeedbackLauncher />
+        {/* Mobile Drawer Overlay */}
+        {mobileOpen && (
+          <div className="fixed inset-0 z-50 md:hidden flex">
+            {/* Backdrop click closer */}
+            <div
+              className="fixed inset-0 bg-primary/20 backdrop-blur-sm"
+              onClick={() => setMobileOpen(false)}
+            />
+            <aside className="relative w-64 bg-surface-container-lowest h-full shadow-2xl flex flex-col z-50">
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="absolute top-4 right-4 p-2 rounded-lg text-on-surface-variant hover:bg-surface-container"
+                aria-label="Close sidebar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <SidebarContent />
+            </aside>
+          </div>
+        )}
+
+        <FeedbackLauncher />
       </div>
     </FeedbackProvider>
   );
