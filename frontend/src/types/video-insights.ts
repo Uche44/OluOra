@@ -17,6 +17,7 @@ interface AnalysisRun {
   id: string;
   status: string;
   comments_analyzed: number;
+  summary: string | null;
   error_message: string | null;
 }
 

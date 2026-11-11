@@ -485,9 +485,12 @@ async def generate_insights_for_analysis(
             "- Write like you are explaining to a friend, not a researcher.\n"
             "- Topic names should be short (max 5 words) and instantly understandable (e.g. 'Tutorial Requests', 'Beginner Confusion', 'Love for the Host').\n"
             "- Descriptions should be 1-2 plain sentences that anyone can understand.\n"
+            "- The overall summary should sound like a person wrote it, not a report. Lead with what the audience is actually talking about, vary your sentence structure, and avoid stock phrases like 'revealing the key themes' or 'this audience is primarily interested in'.\n"
+            "- You may point out which themes dominate and how viewers feel about them, but never invent numbers, quotes, or details that are not in the data.\n"
             "You must return only a valid JSON object. Do not return any Markdown wrapper, preamble, or explanation.\n"
             "The JSON schema must match exactly:\n"
             "{\n"
+            '  "summary": "One or two natural sentences about what this audience is discussing and what stands out.",\n'
             '  "topic_clusters": [\n'
             "    {\n"
             '      "cluster_id": "The cluster_id exactly as given for the group",\n'
@@ -527,12 +530,13 @@ async def generate_insights_for_analysis(
             "Each group includes its cluster_id, its total size, and a diverse sample of "
             "its comments. Treat the sample as evidence of the whole group.\n"
             "Return a JSON object containing:\n"
-            "1. Plain-English names and descriptions for each group in 'topic_clusters'. "
+            "1. An overall 'summary': one or two natural sentences about what this audience is discussing, written the way a human editor would say it.\n"
+            "2. Plain-English names and descriptions for each group in 'topic_clusters'. "
             "Echo the exact 'cluster_id' for every group; do not invent IDs or omit groups.\n"
-            "2. The top recurring questions viewers are asking ('top_questions').\n"
-            "3. Key things frustrating or confusing viewers ('pain_points').\n"
-            "4. The most common things viewers are praising ('positive_themes').\n"
-            "5. Clear, simple video ideas for the creator to make next ('content_recommendations')."
+            "3. The top recurring questions viewers are asking ('top_questions').\n"
+            "4. Key things frustrating or confusing viewers ('pain_points').\n"
+            "5. The most common things viewers are praising ('positive_themes').\n"
+            "6. Clear, simple video ideas for the creator to make next ('content_recommendations')."
         )
 
         # 4. Call Groq
@@ -596,6 +600,13 @@ async def generate_insights_for_analysis(
                     content=item.get("content", "")
                 )
                 db.add(insight_record)
+
+        # 8. Persist the editorial summary for this run. Clear it when the model
+        #    (or the local fallback) omits one so a retry cannot leave stale copy.
+        summary = data.get("summary")
+        analysis.summary = (
+            summary.strip() if isinstance(summary, str) and summary.strip() else None
+        )
 
         analysis.status = "completed"
         await db.commit()

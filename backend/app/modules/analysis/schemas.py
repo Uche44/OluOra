@@ -12,6 +12,7 @@ class AnalysisCreate(AnalysisBase):
 class AnalysisResponse(AnalysisBase):
     id: uuid.UUID
     video_id: uuid.UUID
+    summary: str | None = None
     error_message: str | None = None
     created_at: datetime
     updated_at: datetime

@@ -18,6 +18,9 @@ class Analysis(Base):
     status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False) # pending, running, completed, failed
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     comments_analyzed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # LLM-written editorial summary for this run. Nullable: older runs predate
+    # the column, and a failed/local-fallback generation may not produce one.
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 

@@ -24,6 +24,28 @@ import {
   X,
 } from "lucide-react";
 
+function summarizeAudience(clusters: TopicCluster[]) {
+  if (clusters.length === 0) return null;
+
+  const total = clusters.reduce((sum, cluster) => sum + cluster.size, 0);
+  const share = (cluster: TopicCluster) =>
+    total > 0 ? Math.round((cluster.size / total) * 100) : 0;
+
+  const [top, second] = clusters;
+  const topShare = share(top);
+
+  if (!second) {
+    return `${topShare}% of the comments we read point to the same thing: ${top.title}. This audience is unusually clear about what it wants.`;
+  }
+
+  const secondShare = share(second);
+  if (secondShare >= topShare * 0.75) {
+    return `${top.title} and ${second.title} carry most of the conversation, at ${topShare}% and ${secondShare}% of the comments we read. Both are worth answering head-on.`;
+  }
+
+  return `${top.title} is what this audience keeps coming back to — ${topShare}% of the comments we read land there. ${second.title} follows at ${secondShare}%, but the conversation has a clear center.`;
+}
+
 export default function VideoInsightsPage({
   params,
 }: {
@@ -449,9 +471,10 @@ export default function VideoInsightsPage({
               </span>
               <p className="font-playfair text-lg italic leading-relaxed mt-2 font-medium">
                 &ldquo;
-                {clusters.length > 0
-                  ? `This audience is primarily interested in ${clusters[0].title.toLowerCase()} and ${clusters[1]?.title.toLowerCase() || "tutorials"}, revealing the key themes driving viewer engagement.`
-                  : "We are currently synthesizing your comment themes to construct a unified creator prompt roadmap."}
+                {analysis.summary?.trim() ||
+                  (clusters.length > 0
+                    ? summarizeAudience(clusters)
+                    : "We are currently synthesizing your comment themes to construct a unified creator prompt roadmap.")}
                 &rdquo;
               </p>
             </div>
